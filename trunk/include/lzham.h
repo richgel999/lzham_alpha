@@ -23,7 +23,7 @@
 
 // Upper byte = major version
 // Lower byte = minor version
-#define LZHAM_DLL_VERSION        0x1001
+#define LZHAM_DLL_VERSION        0x1002
 
 #ifdef _WIN64
    #define LZHAM_DLL_FILENAME       L"lzham_x64.dll"

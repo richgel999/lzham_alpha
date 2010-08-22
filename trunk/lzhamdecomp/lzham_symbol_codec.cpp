@@ -1288,17 +1288,13 @@ namespace lzham
          
    uint symbol_codec::decode(adaptive_bit_model& model, bool update_model)
    {
-      if (m_arith_length < cSymbolCodecArithMinLen) 
+      while (m_arith_length < cSymbolCodecArithMinLen) 
       {
          uint c = get_bits(8);
          m_arith_value = (m_arith_value << 8) | c;
-         
          m_arith_length <<= 8;
-         LZHAM_ASSERT(m_arith_length >= cSymbolCodecArithMinLen);
       }
-      
-      LZHAM_ASSERT(m_arith_length >= cSymbolCodecArithMinLen);
-      
+                  
       //uint x = gArithProbMulTab[model.m_bit_0_prob >> (cSymbolCodecArithProbBits - cSymbolCodecArithProbMulBits)][m_arith_length >> (32 - cSymbolCodecArithProbMulLenSigBits)] << 16;
       uint x = model.m_bit_0_prob * (m_arith_length >> cSymbolCodecArithProbBits);
       uint bit = (m_arith_value >= x);

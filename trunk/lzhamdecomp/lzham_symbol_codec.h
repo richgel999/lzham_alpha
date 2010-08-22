@@ -317,7 +317,7 @@ namespace lzham
    
    #define LZHAM_SYMBOL_CODEC_DECODE_ARITH_BIT(codec, result, model) \
    { \
-      if (arith_length < cSymbolCodecArithMinLen) \
+      while (arith_length < cSymbolCodecArithMinLen) \
       { \
          uint c; \
          LZHAM_SYMBOL_CODEC_DECODE_GET_BITS(codec, c, 8); \
