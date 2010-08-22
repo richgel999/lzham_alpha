@@ -54,6 +54,7 @@ typedef unsigned __int64 uint64;
 
 int simple_test(lzham_dll_loader &lzham_dll)
 {
+   printf("\n");
    printf("LZHAM simple memory to memory compression test\n");
          
    lzham_compress_params comp_params;
@@ -264,7 +265,7 @@ static int compress_streaming(lzham_dll_loader &lzham_dll, const char* pSrc_file
    return TRUE;
 }
 
-static int decompress_streaming(lzham_dll_loader &lzham_dll, const char* pSrc_filename, const char *pDst_filename, bool unbuffered)
+static int decompress_file(lzham_dll_loader &lzham_dll, const char* pSrc_filename, const char *pDst_filename, bool unbuffered)
 {
    printf("Testing: Streaming decompression\n");
 
@@ -390,6 +391,7 @@ static int decompress_streaming(lzham_dll_loader &lzham_dll, const char* pSrc_fi
             fclose(pOutFile);
             return FALSE;
          }
+        
          if (out_num_bytes > dst_bytes_left)
          {
             printf("Decompressor wrote too many bytes to destination file!\n");
@@ -671,7 +673,7 @@ static int test_recursive(lzham_dll_loader &lzham_dll, const char *pPath, uint m
          return EXIT_FAILURE;
       }
       
-      status = decompress_streaming(lzham_dll, cmp_file.c_str(), decomp_file.c_str(), unbuffered_decompression);
+      status = decompress_file(lzham_dll, cmp_file.c_str(), decomp_file.c_str(), unbuffered_decompression);
 
       if (!status)
       {
@@ -757,6 +759,8 @@ int main(int argc, char *argv[])
 
    if (argc == 1)
    {
+      print_usage();
+   
       return simple_test(lzham_dll);
    }
    
@@ -789,12 +793,12 @@ int main(int argc, char *argv[])
    }
    else if (argv[1][0] == 'd')
    {
-      if (!decompress_streaming(lzham_dll, argv[2], argv[3], false))
+      if (!decompress_file(lzham_dll, argv[2], argv[3], false))
          status = EXIT_FAILURE;
    }
    else if (argv[1][0] == 'D')
    {
-      if (!decompress_streaming(lzham_dll, argv[2], argv[3], true))
+      if (!decompress_file(lzham_dll, argv[2], argv[3], true))
          status = EXIT_FAILURE;
    }
    else
