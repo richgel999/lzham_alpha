@@ -1,0 +1,66 @@
+# depslib dependency file v1.0
+1282633857 source:e:\lzham\lzham7\lzhamtest\lzhamtest.cpp
+	<stdlib.h>
+	<stdio.h>
+	<assert.h>
+	<memory.h>
+	<vector>
+	<string>
+	"win32_timer.h"
+	<xtl.h>
+	<windows.h>
+	"lzham.h"
+
+1282542077 e:\lzham\lzham7\include\lzham.h
+	"lzham_exports.inc"
+
+1281944878 e:\lzham\lzham7\include\lzham_exports.inc
+
+1282633388 source:e:\lzham\lzham7\lzhamtest\win32_timer.cpp
+	<stdlib.h>
+	<stdio.h>
+	<assert.h>
+	"win32_timer.h"
+	<xtl.h>
+	<windows.h>
+
+1282633377 e:\lzham\lzham7\lzhamtest\win32_timer.h
+
+1282633388 source:e:\lzham\lzham8\lzhamtest\win32_timer.cpp
+	<stdlib.h>
+	<stdio.h>
+	<assert.h>
+	"win32_timer.h"
+	<xtl.h>
+	<windows.h>
+
+1282633377 e:\lzham\lzham8\lzhamtest\win32_timer.h
+
+1282633388 source:e:\lzham\lzham12\lzhamtest\win32_timer.cpp
+	<stdlib.h>
+	<stdio.h>
+	<assert.h>
+	"win32_timer.h"
+	<xtl.h>
+	<windows.h>
+
+1282633377 e:\lzham\lzham12\lzhamtest\win32_timer.h
+
+1283149410 source:e:\lzham\lzham12\lzhamtest\lzhamtest.cpp
+	<stdlib.h>
+	<stdio.h>
+	<assert.h>
+	<memory.h>
+	<vector>
+	<string>
+	"win32_timer.h"
+	<xtl.h>
+	<xbdm.h>
+	<windows.h>
+	"lzham.h"
+
+1283149012 e:\lzham\lzham12\include\lzham.h
+	"lzham_exports.inc"
+
+1282946306 e:\lzham\lzham12\include\lzham_exports.inc
+
