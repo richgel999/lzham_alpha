@@ -1,4 +1,4 @@
-#summary LZHAM codec performance information on popular compression test files.
+#summary LZHAM codec performance on popular compression test files.
 
 LZHAM is now listed on the Large Text Compression Benchmark page:
 http://mattmahoney.net/dc/text.html
