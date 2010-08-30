@@ -6,7 +6,7 @@ http://mattmahoney.net/dc/text.html
 
 As of Aug. 30, 2010 only the alpha2 x86 version of the codec has been tested, using a 64MB dictionary with the "default" compression level.
 
-Interestingly, once you sort this list by decompression speed, LZHAM is among the top 20 fastest decompressors listed. Of those 20, it has the 2nd best compression ratio. (The closed source "lzturbo" codec has a higher compression ratio and decompresses at 20ns/byte vs. LZHAM's 21ns/byte.)
+Interestingly, once you sort this list by decompression speed, LZHAM is among the top 20 fastest decompressors listed. Of those 20, it has the 2nd best compression ratio. (The closed source "lzturbo" codec has a higher compression ratio and decompresses at 20ns/byte vs. LZHAM's 21ns/byte.) (Note: LZHAM's decompressor only uses a single thread.)
 
 However, LZHAM is capable of better compression. Here are the results from the alpha3 x64 version of the compressor using a 512MB dictionary in "Uber" mode (using the -d29 -m4 command line options):
 
