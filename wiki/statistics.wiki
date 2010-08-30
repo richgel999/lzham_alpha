@@ -9,15 +9,15 @@ Interestingly, once you sort this list by decompression speed, LZHAM is among th
 
 However, LZHAM is capable of better compression. Here are the results from the alpha3 x64 version of the compressor using a 512MB dictionary in "Uber" mode (using the -d29 -m4 command line options):
 
-LZHAM alpha3 enwik8: Input file size: 100,000,000, Compressed file size: 24,954,329
-LZHAM alpha3 enwik9: Input file size: 1,000,000,000, Compressed file size: 206,393,809
+  * LZHAM alpha3 enwik8: Input file size: 100,000,000, Compressed file size: 24,954,329
+  * LZHAM alpha3 enwik9: Input file size: 1,000,000,000, Compressed file size: 206,393,809
 
 lzturbo now beats LZHAM on enwik9, but lzturbo is still very slightly ahead on enwik8:
 
-lzturbo 0.94 enwik8: 24,763,542  
-lzturbo 0.94 enwik9: 217,342,694
+  * lzturbo 0.94 enwik8: 24,763,542  
+  * lzturbo 0.94 enwik9: 217,342,694
 
-Here's the output from the compressor running under Win7 x64 on a 2.6 GHz Core i7 with 6MB RAM:
+Here's the output from the lzhamtest_x64 running under Win7 x64 on a 2.6 GHz Core i7 with 6MB RAM:
 
 {{{
 ***** [16 of 48] Compressing file "E:\dev\corpus\enwik8\enwik8" to "__comp_temp_216544519__.tmp"
