@@ -21,9 +21,11 @@
 // THE SOFTWARE.
 #pragma once
 
-#if defined(LZHAM_PLATFORM_PC) && defined(_MSC_VER)
+#if defined(LZHAM_USE_X86_INTRINSICS) && !defined(__MINGW32__)
    #include <intrin.h>
-   #pragma intrinsic(_BitScanReverse)
+   #if defined(_MSC_VER)
+      #pragma intrinsic(_BitScanReverse)
+   #endif
 #endif
 
 namespace lzham
@@ -32,22 +34,22 @@ namespace lzham
    {
    	const float cNearlyInfinite = 1.0e+37f;
 
-      // Yes I know these should probably be pass by ref, not val: 
+      // Yes I know these should probably be pass by ref, not val:
       // http://www.stepanovpapers.com/notes.pdf
       // Just don't use them on non-simple (non built-in) types!
       template<typename T> inline T minimum(T a, T b) { return (a < b) ? a : b; }
-      
+
       template<typename T> inline T minimum(T a, T b, T c) { return minimum(minimum(a, b), c); }
-      
+
       template<typename T> inline T maximum(T a, T b) { return (a > b) ? a : b; }
-      
+
       template<typename T> inline T maximum(T a, T b, T c) { return maximum(maximum(a, b), c); }
-      
+
       template<typename T> inline T clamp(T value, T low, T high) { return (value < low) ? low : ((value > high) ? high : value); }
-      
+
       inline bool is_power_of_2(uint32 x) { return x && ((x & (x - 1U)) == 0U); }
       inline bool is_power_of_2(uint64 x) { return x && ((x & (x - 1U)) == 0U); }
-      
+
       template<typename T> inline T align_up_pointer(T p, uint alignment)
       {
          LZHAM_ASSERT(is_power_of_2(alignment));
@@ -55,7 +57,7 @@ namespace lzham
          q = (q + alignment - 1) & (~((uint_ptr)alignment - 1));
          return reinterpret_cast<T>(q);
       }
-      
+
 		// From "Hackers Delight"
 		// val remains unchanged if it is already a power of 2.
       inline uint32 next_pow2(uint32 val)
@@ -68,7 +70,7 @@ namespace lzham
          val |= val >> 1;
          return val + 1;
       }
-      
+
       // val remains unchanged if it is already a power of 2.
       inline uint64 next_pow2(uint64 val)
       {
@@ -81,18 +83,18 @@ namespace lzham
          val |= val >> 1;
          return val + 1;
       }
-            
+
       inline uint floor_log2i(uint v)
       {
          uint l = 0;
-         while (v > 1U) 
+         while (v > 1U)
          {
             v >>= 1;
             l++;
-         } 
+         }
          return l;
       }
-      
+
       inline uint ceil_log2i(uint v)
       {
          uint l = floor_log2i(v);
@@ -101,25 +103,17 @@ namespace lzham
          return l;
       }
 
-#if 0      
-      unsigned char _BitScanReverse(unsigned long * Index, unsigned long Mask);
-
-      template <class AllIntegers>
-      static __inline int bitLen(AllIntegers n) {
-         if (n < 0) 
-            n = -n;
-         int cnt = 1;
-         while ((n >>= 1) > 0) 
-            ++cnt;
-         return cnt;
-      }
-#endif      
-
-      // Returns the total number of bits needed to encode v.      
+      // Returns the total number of bits needed to encode v.
+      // This needs to be fast - it's used heavily when determining Polar codelengths.
       inline uint total_bits(uint v)
       {
          unsigned long l = 0;
-#if defined(LZHAM_PLATFORM_PC) && defined(_MSC_VER)      
+#if defined(__MINGW32__)
+         if (v)
+         {
+            l = 32 -__builtin_clz(v);
+         }
+#elif defined(LZHAM_USE_X86_INTRINSICS)
          if (_BitScanReverse(&l, v))
          {
             l++;
@@ -129,12 +123,12 @@ namespace lzham
          {
             v >>= 1;
             l++;
-         } 
-#endif   
-         return l;      
+         }
+#endif
+         return l;
       }
-      
-   }      
-   
+
+   }
+
 } // namespace lzham
 

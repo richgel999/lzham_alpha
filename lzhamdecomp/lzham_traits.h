@@ -23,20 +23,20 @@
 
 namespace lzham
 {
-   template<typename T> 
-   struct scalar_type 
-   { 
-      enum { cFlag = false }; 
+   template<typename T>
+   struct scalar_type
+   {
+      enum { cFlag = false };
       static inline void construct(T* p) { helpers::construct(p); }
       static inline void construct(T* p, const T& init) { helpers::construct(p, init); }
       static inline void construct_array(T* p, uint n) { helpers::construct_array(p, n); }
       static inline void destruct(T* p) { helpers::destruct(p); }
       static inline void destruct_array(T* p, uint n) { helpers::destruct_array(p, n); }
    };
-   
+
    template<typename T> struct scalar_type<T*>
-   { 
-      enum { cFlag = true }; 
+   {
+      enum { cFlag = true };
       static inline void construct(T** p) { memset(p, 0, sizeof(T*)); }
       static inline void construct(T** p, T* init) { *p = init; }
       static inline void construct_array(T** p, uint n) { memset(p, 0, sizeof(T*) * n); }
@@ -52,7 +52,7 @@ namespace lzham
    static inline void construct_array(X* p, uint n) { memset(p, 0, sizeof(X) * n); } \
    static inline void destruct(X* p) { p; } \
    static inline void destruct_array(X* p, uint n) { p, n; } };
-      
+
    LZHAM_DEFINE_BUILT_IN_TYPE(bool)
    LZHAM_DEFINE_BUILT_IN_TYPE(char)
    LZHAM_DEFINE_BUILT_IN_TYPE(unsigned char)
@@ -83,7 +83,7 @@ namespace lzham
 
    // Defines type Q as bitwise copyable.
 #define LZHAM_DEFINE_BITWISE_COPYABLE(Q) template<> struct bitwise_copyable<Q> { enum { cFlag = true }; };
-      
+
 #define LZHAM_IS_POD(T) __is_pod(T)
 
 #define LZHAM_IS_SCALAR_TYPE(T) (scalar_type<T>::cFlag)
@@ -114,12 +114,41 @@ namespace lzham
       enum { value = false };
    };
 
-   template <typename T> struct is_pointer<T*>   
+   template <typename T> struct is_pointer<T*>
    {
       enum { value = true };
    };
-   
+
    LZHAM_DEFINE_BITWISE_COPYABLE(empty_type);
    LZHAM_DEFINE_BITWISE_MOVABLE(empty_type);
-   
-} // namespace lzham   
+
+   namespace helpers
+   {
+      template <typename T> 
+      inline void construct_array(T* p, uint n)
+      {
+         if (LZHAM_IS_SCALAR_TYPE(T))
+         {
+            memset(p, 0, sizeof(T) * n);
+         }
+         else
+         {
+            T* q = p + n;
+            for ( ; p != q; ++p)
+               new (static_cast<void*>(p)) T;
+         }
+      }
+      
+      template <typename T>
+      inline void destruct_array(T* p, uint n)
+      {
+         if ( LZHAM_HAS_DESTRUCTOR(T) )
+         {
+            T* q = p + n;
+            for ( ; p != q; ++p)
+               p->~T();
+         }
+      }
+   }
+
+} // namespace lzham

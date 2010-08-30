@@ -30,8 +30,8 @@ namespace lzham
    const uint64 MAX_POSSIBLE_BLOCK_SIZE = 0x400000000ULL;
 #else
    const uint32 MAX_POSSIBLE_BLOCK_SIZE = 0x7FFF0000U;
-#endif   
-      
+#endif
+
    static void* lzham_default_realloc(void* p, size_t size, size_t* pActual_size, bool movable, void* pUser_data)
    {
       pUser_data;
@@ -91,7 +91,7 @@ namespace lzham
    static lzham_realloc_func        g_pRealloc = lzham_default_realloc;
    static lzham_msize_func          g_pMSize   = lzham_default_msize;
    static void*                     g_pUser_data;
-   
+
    static inline void lzham_mem_error(const char* p_msg)
    {
       lzham_assert(p_msg, __FILE__, __LINE__);
@@ -128,7 +128,7 @@ namespace lzham
 
    void* lzham_realloc(void* p, size_t size, size_t* pActual_size, bool movable)
    {
-      if ((uint32)p & (LZHAM_MIN_ALLOC_ALIGNMENT - 1))
+      if ((ptr_bits_t)p & (LZHAM_MIN_ALLOC_ALIGNMENT - 1))
       {
          lzham_mem_error("lzham_realloc: bad ptr");
          return NULL;
@@ -177,8 +177,8 @@ namespace lzham
       }
 
       return (*g_pMSize)(p, g_pUser_data);
-   }   
-   
+   }
+
    void lzham_lib_set_memory_callbacks(lzham_realloc_func pRealloc, lzham_msize_func pMSize, void* pUser_data)
    {
       if ((!pRealloc) || (!pMSize))

@@ -30,42 +30,42 @@ using namespace lzham;
 namespace lzham
 {
    const uint cFiberStackSize = 64 * 1024;
-   
+
    struct lzham_decompress_state
    {
       symbol_codec m_codec;
-   
+
       void *m_pPrimary_fiber;
       void *m_pWorker_fiber;
-      
+
       uint8 *m_pRaw_decomp_buf;
       uint8 *m_pDecomp_buf;
       uint32 m_decomp_adler32;
-                        
+
       const uint8 *m_pIn_buf;
       size_t *m_pIn_buf_size;
       uint8 *m_pOut_buf;
       size_t *m_pOut_buf_size;
       bool m_no_more_input_bytes_flag;
-      
+
       uint8 *m_pOrig_out_buf;
       size_t m_orig_out_buf_size;
-      
+
       lzham_decompress_params m_params;
-      
+
       lzham_decompress_status_t m_status;
-      
+
       typedef quasi_adaptive_huffman_data_model sym_data_model;
       sym_data_model m_lit_table[1 << CLZBase::cNumLitPredBits];
       sym_data_model m_delta_lit_table[1 << CLZBase::cNumDeltaLitPredBits];
       sym_data_model m_main_table;
       sym_data_model m_rep_len_table[2];
       sym_data_model m_large_len_table[2];
-      sym_data_model m_dist_lsb_table; 
+      sym_data_model m_dist_lsb_table;
    };
-   
+
    typedef void (*need_bytes_func_ptr)(uint num_bytes_consumed, void *pPrivate_data, const uint8* &pBuf, uint &buf_size, bool &eof_flag);
-   
+
    static void lzham_return(lzham_decompress_state *pState, lzham_decompress_status_t status)
    {
       pState->m_status = status;
@@ -77,7 +77,7 @@ namespace lzham
             break;
       }
    }
-   
+
    static void lzham_decode_need_bytes_func(size_t num_bytes_consumed, void *p, const uint8* &pBuf, size_t &buf_size, bool &eof_flag)
    {
       lzham_decompress_state *pState = static_cast<lzham_decompress_state *>(p);
@@ -85,18 +85,18 @@ namespace lzham
       {
          *pState->m_pIn_buf_size = num_bytes_consumed;
          *pState->m_pOut_buf_size = 0;
-                  
+
          lzham_return(pState, LZHAM_DECOMP_STATUS_NEEDS_MORE_INPUT);
-                  
+
          pBuf = pState->m_pIn_buf;
          buf_size = *pState->m_pIn_buf_size;
          eof_flag = pState->m_no_more_input_bytes_flag;
-         
+
          if ((eof_flag) || (buf_size))
             break;
-      }         
+      }
    }
-  
+
    static void lzham_flush_output_buf(lzham_decompress_state *pState, size_t total_bytes)
    {
       const uint8 *pDecomp_src = pState->m_pDecomp_buf;
@@ -104,7 +104,7 @@ namespace lzham
       while (num_bytes_remaining)
       {
          size_t n = LZHAM_MIN(num_bytes_remaining, *pState->m_pOut_buf_size);
-         
+
          if (!pState->m_params.m_compute_adler32)
          {
             memcpy(pState->m_pOut_buf, pDecomp_src, n);
@@ -121,46 +121,46 @@ namespace lzham
                copy_ofs += bytes_to_copy;
             }
          }
-                  
+
          *pState->m_pIn_buf_size = static_cast<size_t>(pState->m_codec.decode_get_bytes_consumed());
          *pState->m_pOut_buf_size = n;
-         
+
          lzham_return(pState, LZHAM_DECOMP_STATUS_NOT_FINISHED);
-         
+
          pState->m_codec.decode_set_input_buffer(pState->m_pIn_buf, *pState->m_pIn_buf_size, pState->m_pIn_buf, pState->m_no_more_input_bytes_flag);
-         
+
          pDecomp_src += n;
          num_bytes_remaining -= n;
       }
    }
-   
+
    static void lzham_decompress_worker_fiber_buffered(void* p);
    static void lzham_decompress_worker_fiber_unbuffered(void* p);
-   
-   static const uint8 s_literal_next_state[24] = 
-   { 
-      0, 0, 0, 0, 
-      1, 2, 3, 4, 5, 6,  
-      4, 5, 7, 7, 7, 7, 7, 7, 7, 10, 10, 10, 10, 10 
+
+   static const uint8 s_literal_next_state[24] =
+   {
+      0, 0, 0, 0,
+      1, 2, 3, 4, 5, 6,
+      4, 5, 7, 7, 7, 7, 7, 7, 7, 10, 10, 10, 10, 10
    };
-   
+
    //------------------------------------------------------------------------------------------------------------------
    // buffered output
    //------------------------------------------------------------------------------------------------------------------
    static void lzham_decompress_worker_fiber_buffered(void* p)
    {
-      lzham_decompress_state *pState = static_cast<lzham_decompress_state *>(p);   
-   
+      lzham_decompress_state *pState = static_cast<lzham_decompress_state *>(p);
+
       if (!pState->m_codec.start_decoding(pState->m_pIn_buf, *pState->m_pIn_buf_size, pState->m_no_more_input_bytes_flag, lzham_decode_need_bytes_func, pState))
       {
          lzham_return(pState, LZHAM_DECOMP_STATUS_FAILED);
       }
-      
+
       LZHAM_ASSUME(CLZBase::cNumStates <= 16);
       adaptive_bit_model m_is_match_model[(1 << CLZBase::cNumIsMatchContextBits) * 16];
       adaptive_bit_model m_is_rep_model[CLZBase::cNumStates];
       adaptive_bit_model m_is_rep0_model[CLZBase::cNumStates];
-      adaptive_bit_model m_is_rep0_single_byte_model[CLZBase::cNumStates];      
+      adaptive_bit_model m_is_rep0_single_byte_model[CLZBase::cNumStates];
       adaptive_bit_model m_is_rep1_model[CLZBase::cNumStates];
 
       CLZBase lzBase;
@@ -168,24 +168,24 @@ namespace lzham
 
       const uint dict_size = 1U << pState->m_params.m_dict_size_log2;
       const uint dict_size_mask = dict_size - 1;
-      
+
       uint8* pDst = reinterpret_cast<uint8*>(pState->m_pDecomp_buf);
       uint8* pDst_end = pDst + dict_size;
       uint dst_ofs = 0;
-      
+
       symbol_codec &codec = pState->m_codec;
-      
+
       uint step = 0;
-            
+
       lzham_decompress_status_t status = LZHAM_DECOMP_STATUS_NOT_FINISHED;
-      
+
       bool huffman_decoders_initialized = false;
-                        
+
       do
       {
          codec.start_arith_decoding();
-         
-#ifdef LZDEBUG              
+
+#ifdef LZDEBUG
          uint k = codec.decode_bits(12); LZHAM_VERIFY(k==166);
 #endif
 
@@ -202,22 +202,22 @@ namespace lzham
             for (uint i = 0; i < (1 << CLZBase::cNumDeltaLitPredBits); i++)
                pState->m_delta_lit_table[i].init(false, 256, fast_huffman_coding, use_polar_codes);
 
-            pState->m_main_table.init(false, CLZBase::cLZXNumSpecialLengths + (lzBase.m_num_lzx_slots - CLZBase::cLowestUsableMatchSlot) * 8, fast_huffman_coding, use_polar_codes);
+            pState->m_main_table.init(false, CLZBase::cLZXNumSpecialLengths + (lzBase.m_num_lzx_slots - CLZBase::cLZXLowestUsableMatchSlot) * 8, fast_huffman_coding, use_polar_codes);
             for (uint i = 0; i < 2; i++)
             {
                pState->m_rep_len_table[i].init(false, CLZBase::cMaxMatchLen - CLZBase::cMinMatchLen + 1, fast_huffman_coding, use_polar_codes);
                pState->m_large_len_table[i].init(false, CLZBase::cLZXNumSecondaryLengths, fast_huffman_coding, use_polar_codes);
             }
             pState->m_dist_lsb_table.init(false, 16, fast_huffman_coding, use_polar_codes);
-         }            
-         
+         }
+
          uint block_type = codec.decode_bits(2);
          switch (block_type)
          {
             case CLZBase::cRawBlock:
             {
                const uint raw_block_len = 1 + codec.decode_bits(24);
-               
+
                codec.decode_align_to_byte();
 
                uint num_raw_bytes_remaining = raw_block_len;
@@ -226,49 +226,49 @@ namespace lzham
                   int b = codec.decode_remove_byte_from_bit_buf();
                   if (b < 0)
                      break;
-                   
-                  pDst[dst_ofs++] = static_cast<uint8>(b); 
+
+                  pDst[dst_ofs++] = static_cast<uint8>(b);
                   if (dst_ofs > dict_size_mask)
                   {
                      lzham_flush_output_buf(pState, dict_size);
                      dst_ofs = 0;
                   }
-                  
+
                   num_raw_bytes_remaining--;
                }
-               
+
                while (num_raw_bytes_remaining)
                {
                   uint64 src_ofs = codec.decode_get_bytes_consumed();
                   uint64 src_bytes_remaining = *pState->m_pIn_buf_size - src_ofs;
-                  
+
                   while (!src_bytes_remaining)
                   {
                      if (pState->m_no_more_input_bytes_flag)
                      {
                         lzham_return(pState, LZHAM_DECOMP_STATUS_FAILED);
                      }
-                     
+
                      *pState->m_pIn_buf_size = static_cast<size_t>(src_ofs);
                      *pState->m_pOut_buf_size = 0;
-                     
+
                      lzham_return(pState, LZHAM_DECOMP_STATUS_NEEDS_MORE_INPUT);
                      pState->m_codec.decode_set_input_buffer(pState->m_pIn_buf, *pState->m_pIn_buf_size, pState->m_pIn_buf, pState->m_no_more_input_bytes_flag);
-                     
+
                      src_ofs = 0;
                      src_bytes_remaining = *pState->m_pIn_buf_size;
                   }
-                  
+
                   uint num_bytes_to_copy = static_cast<uint>(LZHAM_MIN(num_raw_bytes_remaining, src_bytes_remaining));
                   num_bytes_to_copy = LZHAM_MIN(num_bytes_to_copy, dict_size - dst_ofs);
-                                       
+
                   memcpy(pDst + dst_ofs, pState->m_pIn_buf + src_ofs, num_bytes_to_copy);
-                                                                        
+
                   src_ofs += num_bytes_to_copy;
                   num_raw_bytes_remaining -= num_bytes_to_copy;
-                  
+
                   codec.decode_set_input_buffer(pState->m_pIn_buf, *pState->m_pIn_buf_size, pState->m_pIn_buf + src_ofs, pState->m_no_more_input_bytes_flag);
-                                                      
+
                   dst_ofs += num_bytes_to_copy;
                   if (dst_ofs > dict_size_mask)
                   {
@@ -277,40 +277,45 @@ namespace lzham
                      dst_ofs = 0;
                   }
                }
-                              
+
                break;
             }
             case CLZBase::cCompBlock:
             {
                const uint initial_step = step;
                initial_step;
-               
+
                int match_hist0 = 1;
                int match_hist1 = 2;
                int match_hist2 = 3;
                uint cur_state = 0;
-               
+
                uint start_block_dst_ofs = dst_ofs;
-               
+
                symbol_codec &codec = pState->m_codec;
                LZHAM_SYMBOL_CODEC_DECODE_DECLARE(codec);
                LZHAM_SYMBOL_CODEC_DECODE_BEGIN(codec);
-               
+
                uint prev_char = 0;
                uint prev_prev_char = 0;
-                                             
-               for ( ; ; step++)
+
+#ifdef LZDEBUG
+               uint block_step = 0;
+               for ( ; ; step++, block_step++)
+#else
+               for ( ; ; )
+#endif
                {
-#ifdef LZDEBUG      
-                  uint x; LZHAM_SYMBOL_CODEC_DECODE_GET_BITS(codec, x, 12);
-                  LZHAM_VERIFY(x == 666);
+#ifdef LZDEBUG
+                  uint x; LZHAM_SYMBOL_CODEC_DECODE_GET_BITS(codec, x, CLZBase::cLZHAMDebugSyncMarkerBits);
+                  LZHAM_VERIFY(x == CLZBase::cLZHAMDebugSyncMarkerValue);
                   uint m; LZHAM_SYMBOL_CODEC_DECODE_GET_BITS(codec, m, 1);
                   uint mlen; LZHAM_SYMBOL_CODEC_DECODE_GET_BITS(codec, mlen, 9);
                   uint s; LZHAM_SYMBOL_CODEC_DECODE_GET_BITS(codec, s, 4);
                   LZHAM_VERIFY(cur_state == s);
-#endif            
-#ifdef _DEBUG     
-{  
+#endif
+#ifdef _DEBUG
+{
                   uint total_block_bytes = ((dst_ofs - start_block_dst_ofs) & dict_size_mask);
                   if (total_block_bytes > 0)
                   {
@@ -320,7 +325,7 @@ namespace lzham
                   {
                      LZHAM_ASSERT(prev_char==0);
                   }
-                  
+
                   if (total_block_bytes > 1)
                   {
                      LZHAM_ASSERT(prev_prev_char==pDst[(dst_ofs - 2) & dict_size_mask]);
@@ -329,31 +334,31 @@ namespace lzham
                   {
                      LZHAM_ASSERT(prev_prev_char==0);
                   }
-}                  
-#endif                  
+}
+#endif
                   uint match_pred = prev_char >> (8 - CLZBase::cNumIsMatchContextBits);
                   uint match_model_index = cur_state + (match_pred << 4);
                   LZHAM_ASSERT(match_model_index < LZHAM_ARRAY_SIZE(m_is_match_model));
-                  uint bit; 
+                  uint bit;
                   LZHAM_SYMBOL_CODEC_DECODE_ARITH_BIT(codec, bit, m_is_match_model[match_model_index]);
-                  
-#ifdef LZDEBUG                        
+
+#ifdef LZDEBUG
                   LZHAM_VERIFY(bit == m);
-#endif                  
-                  
+#endif
+
                   if (!bit)
                   {
-#ifdef LZDEBUG                        
+#ifdef LZDEBUG
                      LZHAM_VERIFY(mlen == 1);
-#endif                     
-                                          
-#ifdef LZDEBUG                           
+#endif
+
+#ifdef LZDEBUG
                      uint l; LZHAM_SYMBOL_CODEC_DECODE_GET_BITS(codec, l, 8);
-#endif                     
+#endif
 
                      if (cur_state < CLZBase::cNumLitStates)
                      {
-                        uint lit_pred = (prev_char >> (8 - CLZBase::cNumLitPredBits / 2)) | 
+                        uint lit_pred = (prev_char >> (8 - CLZBase::cNumLitPredBits / 2)) |
                                         (prev_prev_char >> (8 - CLZBase::cNumLitPredBits / 2)) << (CLZBase::cNumLitPredBits / 2);
 
                         // literal
@@ -363,46 +368,46 @@ namespace lzham
                         prev_prev_char = prev_char;
                         prev_char = r;
 
-#ifdef LZDEBUG                              
+#ifdef LZDEBUG
                         LZHAM_VERIFY(pDst[dst_ofs] == l);
-#endif                        
+#endif
                      }
                      else
                      {
                         // delta literal
                         uint rep_lit0 = 0;
                         uint rep_lit1 = 0;
-                                                
+
                         int total_block_bytes = (dst_ofs - start_block_dst_ofs) & dict_size_mask;
                         if (total_block_bytes >= match_hist0)
                         {
                            rep_lit0 = pDst[(dst_ofs - match_hist0) & dict_size_mask];
-                        
+
                            if (total_block_bytes > match_hist0)
                            {
                               rep_lit1 = pDst[(dst_ofs - match_hist0 - 1) & dict_size_mask];
                            }
-                        }                              
-                        
+                        }
+
                         uint lit_pred = (rep_lit0 >> (8 - CLZBase::cNumDeltaLitPredBits / 2)) |
                            ((rep_lit1 >> (8 - CLZBase::cNumDeltaLitPredBits / 2)) << CLZBase::cNumDeltaLitPredBits / 2);
-                        
-#ifdef LZDEBUG                           
+
+#ifdef LZDEBUG
                         uint q; LZHAM_SYMBOL_CODEC_DECODE_GET_BITS(codec, q, 8);
                         LZHAM_VERIFY(q == rep_lit0);
 #endif
-                        
+
                         uint r; LZHAM_SYMBOL_CODEC_DECODE_ADAPTIVE_HUFFMAN(codec, r, pState->m_delta_lit_table[lit_pred]);
                         r ^= rep_lit0;
                         pDst[dst_ofs] = static_cast<uint8>(r);
                         prev_prev_char = prev_char;
                         prev_char = r;
 
-#ifdef LZDEBUG                              
+#ifdef LZDEBUG
                         LZHAM_VERIFY(pDst[dst_ofs] == l);
-#endif                        
+#endif
                      }
-                     
+
                      dst_ofs++;
                      if (dst_ofs > dict_size_mask)
                      {
@@ -411,13 +416,13 @@ namespace lzham
                         LZHAM_SYMBOL_CODEC_DECODE_BEGIN(codec);
                         dst_ofs = 0;
                      }
-                                          
+
                      cur_state = s_literal_next_state[cur_state];
                   }
                   else
                   {
                      uint match_len;
-                                          
+
                      uint is_rep; LZHAM_SYMBOL_CODEC_DECODE_ARITH_BIT(codec, is_rep, m_is_rep_model[cur_state]);
                      if (is_rep)
                      {
@@ -428,24 +433,24 @@ namespace lzham
                            if (is_rep0_len1)
                            {
                               match_len = 1;
-                              
+
                               cur_state = (cur_state < CLZBase::cNumLitStates) ? 9 : 11;
                            }
                            else
                            {
                               LZHAM_SYMBOL_CODEC_DECODE_ADAPTIVE_HUFFMAN(codec, match_len, pState->m_rep_len_table[cur_state >= CLZBase::cNumLitStates]);
                               match_len += CLZBase::cMinMatchLen;
-                              
-                              cur_state = (cur_state < CLZBase::cNumLitStates) ? 8 : 11;  
+
+                              cur_state = (cur_state < CLZBase::cNumLitStates) ? 8 : 11;
                            }
                         }
                         else
                         {
                            uint is_rep1; LZHAM_SYMBOL_CODEC_DECODE_ARITH_BIT(codec, is_rep1, m_is_rep1_model[cur_state]);
-                                                      
+
                            LZHAM_SYMBOL_CODEC_DECODE_ADAPTIVE_HUFFMAN(codec, match_len, pState->m_rep_len_table[cur_state >= CLZBase::cNumLitStates]);
                            match_len += CLZBase::cMinMatchLen;
-                                                      
+
                            if (is_rep1)
                            {
                               std::swap(match_hist0, match_hist1);
@@ -458,19 +463,31 @@ namespace lzham
                               match_hist1 = match_hist0;
                               match_hist0 = temp;
                            }
-                           
+
                            cur_state = (cur_state < CLZBase::cNumLitStates) ? 8 : 11;
                         }
                      }
                      else
                      {
                         uint sym; LZHAM_SYMBOL_CODEC_DECODE_ADAPTIVE_HUFFMAN(codec, sym, pState->m_main_table);
-                        if (sym == 0)
-                           break;
                         sym -= CLZBase::cLZXNumSpecialLengths;
-                        
+                        if (static_cast<int>(sym) < 0)
+                        {
+                           if (static_cast<int>(sym) == (CLZBase::cLZXSpecialCodeEndOfBlockCode - CLZBase::cLZXNumSpecialLengths))
+                              break;
+                           else
+                           {
+                              // reset state partial
+                              match_hist0 = 1;
+                              match_hist1 = 2;
+                              match_hist2 = 3;
+                              cur_state = 0;
+                              continue;
+                           }
+                        }
+
                         match_len = (sym & 7) + 2;
-                        uint match_slot = (sym >> 3) + CLZBase::cLowestUsableMatchSlot;
+                        uint match_slot = (sym >> 3) + CLZBase::cLZXLowestUsableMatchSlot;
 
                         if (match_len == 9)
                         {
@@ -493,7 +510,7 @@ namespace lzham
                               LZHAM_SYMBOL_CODEC_DECODE_GET_BITS(codec, extra_bits, num_extra_bits - 4);
                               extra_bits <<= 4;
                            }
-                              
+
                            uint j; LZHAM_SYMBOL_CODEC_DECODE_ADAPTIVE_HUFFMAN(codec, j, pState->m_dist_lsb_table);
                            extra_bits += j;
                         }
@@ -501,18 +518,18 @@ namespace lzham
                         match_hist2 = match_hist1;
                         match_hist1 = match_hist0;
                         match_hist0 = lzBase.m_lzx_position_base[match_slot] + extra_bits;
-                        
+
                         cur_state = (cur_state < CLZBase::cNumLitStates) ? CLZBase::cNumLitStates : CLZBase::cNumLitStates + 3;
                      }
 
-#ifdef LZDEBUG                           
+#ifdef LZDEBUG
                      LZHAM_VERIFY(match_len == mlen);
-                     uint d; LZHAM_SYMBOL_CODEC_DECODE_GET_BITS(codec, d, 23);
+                     uint d; LZHAM_SYMBOL_CODEC_DECODE_GET_BITS(codec, d, 29);
                      LZHAM_VERIFY(match_hist0 == d);
-#endif                     
+#endif
                      uint src_ofs = (dst_ofs - match_hist0) & dict_size_mask;
                      const uint8* pCopy_src = pDst + src_ofs;
-                                       
+
                      if ((LZHAM_MAX(src_ofs, dst_ofs) + match_len) > dict_size_mask)
                      {
                         for (int i = match_len; i > 0; i--)
@@ -521,12 +538,12 @@ namespace lzham
                            prev_prev_char = prev_char;
                            prev_char = c;
                            pDst[dst_ofs++] = c;
-                           
+
                            if (pCopy_src == pDst_end)
                            {
                               pCopy_src = pDst;
                            }
-                           
+
                            if (dst_ofs > dict_size_mask)
                            {
                               LZHAM_SYMBOL_CODEC_DECODE_END(codec);
@@ -536,7 +553,7 @@ namespace lzham
                            }
                         }
                      }
-                     else 
+                     else
                      {
                         uint8* pCopy_dst = pDst + dst_ofs;
                         if (match_hist0 == 1)
@@ -580,7 +597,7 @@ namespace lzham
                            }
                            prev_prev_char = *pCopy_src++;
                            *pCopy_dst++ = static_cast<uint8>(prev_prev_char);
-                           
+
                            prev_char = *pCopy_src++;
                            *pCopy_dst++ = static_cast<uint8>(prev_char);
                         }
@@ -588,14 +605,14 @@ namespace lzham
                      }
                   }
                }
-               
-               LZHAM_SYMBOL_CODEC_DECODE_END(codec);     
-               
-#ifdef LZDEBUG              
+
+               LZHAM_SYMBOL_CODEC_DECODE_END(codec);
+
+#ifdef LZDEBUG
                uint k = codec.decode_bits(12); LZHAM_VERIFY(k == 366);
-#endif          
+#endif
                codec.decode_align_to_byte();
-               
+
                break;
             }
             case CLZBase::cEOFBlock:
@@ -610,18 +627,18 @@ namespace lzham
             }
          }
       } while (status == LZHAM_DECOMP_STATUS_NOT_FINISHED);
-            
+
       if (dst_ofs)
       {
          lzham_flush_output_buf(pState, dst_ofs);
       }
-      
+
       if (status == LZHAM_DECOMP_STATUS_SUCCESS)
       {
-         codec.decode_align_to_byte();      
-         
+         codec.decode_align_to_byte();
+
          uint src_file_adler32 = codec.decode_bits(32);
-         
+
          if (pState->m_params.m_compute_adler32)
          {
             if (src_file_adler32 != pState->m_decomp_adler32)
@@ -634,81 +651,81 @@ namespace lzham
             pState->m_decomp_adler32 = src_file_adler32;
          }
       }
-      
+
       *pState->m_pIn_buf_size = static_cast<size_t>(codec.stop_decoding());
       *pState->m_pOut_buf_size = 0;
-      
+
       lzham_return(pState, status);
    }
-   
+
    //------------------------------------------------------------------------------------------------------------------
    // unbuffered output
    //------------------------------------------------------------------------------------------------------------------
    static void lzham_decompress_worker_fiber_unbuffered(void* p)
    {
-      lzham_decompress_state *pState = static_cast<lzham_decompress_state *>(p);   
-   
+      lzham_decompress_state *pState = static_cast<lzham_decompress_state *>(p);
+
       if (!pState->m_codec.start_decoding(pState->m_pIn_buf, *pState->m_pIn_buf_size, pState->m_no_more_input_bytes_flag, lzham_decode_need_bytes_func, pState))
       {
          lzham_return(pState, LZHAM_DECOMP_STATUS_FAILED);
       }
-      
+
       LZHAM_ASSUME(CLZBase::cNumStates <= 16);
       adaptive_bit_model m_is_match_model[(1 << CLZBase::cNumIsMatchContextBits) * 16];
       adaptive_bit_model m_is_rep_model[CLZBase::cNumStates];
       adaptive_bit_model m_is_rep0_model[CLZBase::cNumStates];
-      adaptive_bit_model m_is_rep0_single_byte_model[CLZBase::cNumStates];      
+      adaptive_bit_model m_is_rep0_single_byte_model[CLZBase::cNumStates];
       adaptive_bit_model m_is_rep1_model[CLZBase::cNumStates];
-      
+
       CLZBase lzBase;
       lzBase.init_position_slots(pState->m_params.m_dict_size_log2);
-                 
+
       const size_t max_dst_ofs = *pState->m_pOut_buf_size - 1;
-            
+
       uint8* pDst = reinterpret_cast<uint8*>(pState->m_pOut_buf);
       size_t dst_ofs = 0;
-      
+
       symbol_codec &codec = pState->m_codec;
-      
+
       uint step = 0;
-            
+
       lzham_decompress_status_t status = LZHAM_DECOMP_STATUS_NOT_FINISHED;
-      
+
       bool huffman_decoders_initialized = false;
-                        
+
       do
       {
          codec.start_arith_decoding();
-         
+
          if (!huffman_decoders_initialized)
          {
             huffman_decoders_initialized = true;
-            
+
             bool fast_huffman_coding = (codec.decode_bits(1) != 0);
             bool use_polar_codes = (codec.decode_bits(1) != 0);
-            
+
             for (uint i = 0; i < (1 << CLZBase::cNumLitPredBits); i++)
                pState->m_lit_table[i].init(false, 256, fast_huffman_coding, use_polar_codes);
 
             for (uint i = 0; i < (1 << CLZBase::cNumDeltaLitPredBits); i++)
                pState->m_delta_lit_table[i].init(false, 256, fast_huffman_coding, use_polar_codes);
 
-            pState->m_main_table.init(false, CLZBase::cLZXNumSpecialLengths + (lzBase.m_num_lzx_slots - CLZBase::cLowestUsableMatchSlot) * 8, fast_huffman_coding, use_polar_codes);
+            pState->m_main_table.init(false, CLZBase::cLZXNumSpecialLengths + (lzBase.m_num_lzx_slots - CLZBase::cLZXLowestUsableMatchSlot) * 8, fast_huffman_coding, use_polar_codes);
             for (uint i = 0; i < 2; i++)
             {
                pState->m_rep_len_table[i].init(false, CLZBase::cMaxMatchLen - CLZBase::cMinMatchLen + 1, fast_huffman_coding, use_polar_codes);
                pState->m_large_len_table[i].init(false, CLZBase::cLZXNumSecondaryLengths, fast_huffman_coding, use_polar_codes);
             }
             pState->m_dist_lsb_table.init(false, 16, fast_huffman_coding, use_polar_codes);
-         }            
-         
+         }
+
          uint block_type = codec.decode_bits(2);
          switch (block_type)
          {
             case CLZBase::cRawBlock:
             {
                const uint raw_block_len = 1 + codec.decode_bits(24);
-               
+
                codec.decode_align_to_byte();
 
                size_t num_raw_bytes_remaining = raw_block_len;
@@ -717,93 +734,98 @@ namespace lzham
                   int b = codec.decode_remove_byte_from_bit_buf();
                   if (b < 0)
                      break;
-                  
+
                   if (dst_ofs > max_dst_ofs)
                   {
                      lzham_return(pState, LZHAM_DECOMP_STATUS_FAILED_DEST_BUF_TOO_SMALL);
-                  } 
-                  
-                  pDst[dst_ofs++] = static_cast<uint8>(b); 
-                                    
+                  }
+
+                  pDst[dst_ofs++] = static_cast<uint8>(b);
+
                   num_raw_bytes_remaining--;
                }
-               
+
                while (num_raw_bytes_remaining)
                {
                   uint64 src_ofs = codec.decode_get_bytes_consumed();
                   uint64 src_bytes_remaining = *pState->m_pIn_buf_size - src_ofs;
-                  
+
                   while (!src_bytes_remaining)
                   {
                      if (pState->m_no_more_input_bytes_flag)
                      {
                         lzham_return(pState, LZHAM_DECOMP_STATUS_FAILED);
                      }
-                     
+
                      *pState->m_pIn_buf_size = static_cast<size_t>(src_ofs);
                      *pState->m_pOut_buf_size = 0;
-                     
+
                      lzham_return(pState, LZHAM_DECOMP_STATUS_NEEDS_MORE_INPUT);
                      pState->m_codec.decode_set_input_buffer(pState->m_pIn_buf, *pState->m_pIn_buf_size, pState->m_pIn_buf, pState->m_no_more_input_bytes_flag);
-                     
+
                      src_ofs = 0;
                      src_bytes_remaining = *pState->m_pIn_buf_size;
                   }
-                  
+
                   if (dst_ofs > max_dst_ofs)
                   {
                      lzham_return(pState, LZHAM_DECOMP_STATUS_FAILED_DEST_BUF_TOO_SMALL);
-                  } 
-                  
+                  }
+
                   size_t num_bytes_to_copy = static_cast<uint>(LZHAM_MIN(num_raw_bytes_remaining, src_bytes_remaining));
                   num_bytes_to_copy = LZHAM_MIN(num_bytes_to_copy, max_dst_ofs - dst_ofs + 1);
                   LZHAM_ASSERT(num_bytes_to_copy);
-                  
+
                   memcpy(pDst + dst_ofs, pState->m_pIn_buf + src_ofs, num_bytes_to_copy);
-                                                                        
+
                   src_ofs += num_bytes_to_copy;
                   num_raw_bytes_remaining -= num_bytes_to_copy;
-                  
+
                   codec.decode_set_input_buffer(pState->m_pIn_buf, *pState->m_pIn_buf_size, pState->m_pIn_buf + src_ofs, pState->m_no_more_input_bytes_flag);
-                                                      
+
                   dst_ofs += num_bytes_to_copy;
                }
-                              
+
                break;
             }
             case CLZBase::cCompBlock:
             {
                const uint initial_step = step;
                initial_step;
-               
+
                int match_hist0 = 1;
                int match_hist1 = 2;
                int match_hist2 = 3;
                uint cur_state = 0;
-               
+
                size_t start_block_dst_ofs = dst_ofs;
-               
+
                symbol_codec &codec = pState->m_codec;
                LZHAM_SYMBOL_CODEC_DECODE_DECLARE(codec);
                LZHAM_SYMBOL_CODEC_DECODE_BEGIN(codec);
-               
+
                uint prev_char = 0;
                uint prev_prev_char = 0;
-                                             
-               for ( ; ; step++)
+
+#ifdef LZDEBUG
+               uint block_step = 0;
+               for ( ; ; step++, block_step++)
+#else
+               for ( ; ; )
+#endif
                {
                   uint match_pred = prev_char >> (8 - CLZBase::cNumIsMatchContextBits);
                   uint match_model_index = cur_state + (match_pred << 4);
                   LZHAM_ASSERT(match_model_index < LZHAM_ARRAY_SIZE(m_is_match_model));
-                  uint bit; 
+                  uint bit;
                   LZHAM_SYMBOL_CODEC_DECODE_ARITH_BIT(codec, bit, m_is_match_model[match_model_index]);
-                  
+
                   if (!bit)
                   {
                      uint r;
                      if (cur_state < CLZBase::cNumLitStates)
                      {
-                        uint lit_pred = (prev_char >> (8 - CLZBase::cNumLitPredBits / 2)) | 
+                        uint lit_pred = (prev_char >> (8 - CLZBase::cNumLitPredBits / 2)) |
                                         (prev_prev_char >> (8 - CLZBase::cNumLitPredBits / 2)) << (CLZBase::cNumLitPredBits / 2);
 
                         // literal
@@ -814,40 +836,40 @@ namespace lzham
                         // delta literal
                         uint rep_lit0 = 0;
                         uint rep_lit1 = 0;
-                        
+
                         ptrdiff_t total_block_bytes = dst_ofs - start_block_dst_ofs;
                         if (total_block_bytes >= match_hist0)
                         {
                            rep_lit0 = pDst[dst_ofs - match_hist0];
-                        
+
                            if (total_block_bytes > match_hist0)
                            {
                               rep_lit1 = pDst[dst_ofs - match_hist0 - 1];
                            }
-                        }                              
-                        
+                        }
+
                         uint lit_pred = (rep_lit0 >> (8 - CLZBase::cNumDeltaLitPredBits / 2)) |
                            ((rep_lit1 >> (8 - CLZBase::cNumDeltaLitPredBits / 2)) << CLZBase::cNumDeltaLitPredBits / 2);
-                        
+
                         LZHAM_SYMBOL_CODEC_DECODE_ADAPTIVE_HUFFMAN(codec, r, pState->m_delta_lit_table[lit_pred]);
                         r ^= rep_lit0;
                      }
-                     
+
                      if (dst_ofs > max_dst_ofs)
                      {
                         lzham_return(pState, LZHAM_DECOMP_STATUS_FAILED_DEST_BUF_TOO_SMALL);
-                     } 
-                     
+                     }
+
                      pDst[dst_ofs++] = static_cast<uint8>(r);
                      prev_prev_char = prev_char;
                      prev_char = r;
-                                                                                                         
+
                      cur_state = s_literal_next_state[cur_state];
                   }
                   else
                   {
                      uint match_len;
-                                          
+
                      uint is_rep; LZHAM_SYMBOL_CODEC_DECODE_ARITH_BIT(codec, is_rep, m_is_rep_model[cur_state]);
                      if (is_rep)
                      {
@@ -858,24 +880,24 @@ namespace lzham
                            if (is_rep0_len1)
                            {
                               match_len = 1;
-                              
+
                               cur_state = (cur_state < CLZBase::cNumLitStates) ? 9 : 11;
                            }
                            else
                            {
                               LZHAM_SYMBOL_CODEC_DECODE_ADAPTIVE_HUFFMAN(codec, match_len, pState->m_rep_len_table[cur_state >= CLZBase::cNumLitStates]);
                               match_len += CLZBase::cMinMatchLen;
-                              
-                              cur_state = (cur_state < CLZBase::cNumLitStates) ? 8 : 11;  
+
+                              cur_state = (cur_state < CLZBase::cNumLitStates) ? 8 : 11;
                            }
                         }
                         else
                         {
                            uint is_rep1; LZHAM_SYMBOL_CODEC_DECODE_ARITH_BIT(codec, is_rep1, m_is_rep1_model[cur_state]);
-                                                      
+
                            LZHAM_SYMBOL_CODEC_DECODE_ADAPTIVE_HUFFMAN(codec, match_len, pState->m_rep_len_table[cur_state >= CLZBase::cNumLitStates]);
                            match_len += CLZBase::cMinMatchLen;
-                                                      
+
                            if (is_rep1)
                            {
                               std::swap(match_hist0, match_hist1);
@@ -888,19 +910,31 @@ namespace lzham
                               match_hist1 = match_hist0;
                               match_hist0 = temp;
                            }
-                           
+
                            cur_state = (cur_state < CLZBase::cNumLitStates) ? 8 : 11;
                         }
                      }
                      else
                      {
                         uint sym; LZHAM_SYMBOL_CODEC_DECODE_ADAPTIVE_HUFFMAN(codec, sym, pState->m_main_table);
-                        if (sym == 0)
-                           break;
                         sym -= CLZBase::cLZXNumSpecialLengths;
-                        
+                        if (static_cast<int>(sym) < 0)
+                        {
+                           if (static_cast<int>(sym) == (CLZBase::cLZXSpecialCodeEndOfBlockCode - CLZBase::cLZXNumSpecialLengths))
+                              break;
+                           else
+                           {
+                              // reset state partial
+                              match_hist0 = 1;
+                              match_hist1 = 2;
+                              match_hist2 = 3;
+                              cur_state = 0;
+                              continue;
+                           }
+                        }
+
                         match_len = (sym & 7) + 2;
-                        uint match_slot = (sym >> 3) + CLZBase::cLowestUsableMatchSlot;
+                        uint match_slot = (sym >> 3) + CLZBase::cLZXLowestUsableMatchSlot;
 
                         if (match_len == 9)
                         {
@@ -923,7 +957,7 @@ namespace lzham
                               LZHAM_SYMBOL_CODEC_DECODE_GET_BITS(codec, extra_bits, num_extra_bits - 4);
                               extra_bits <<= 4;
                            }
-                              
+
                            uint j; LZHAM_SYMBOL_CODEC_DECODE_ADAPTIVE_HUFFMAN(codec, j, pState->m_dist_lsb_table);
                            extra_bits += j;
                         }
@@ -931,7 +965,7 @@ namespace lzham
                         match_hist2 = match_hist1;
                         match_hist1 = match_hist0;
                         match_hist0 = lzBase.m_lzx_position_base[match_slot] + extra_bits;
-                        
+
                         cur_state = (cur_state < CLZBase::cNumLitStates) ? CLZBase::cNumLitStates : CLZBase::cNumLitStates + 3;
                      }
 
@@ -939,10 +973,10 @@ namespace lzham
                      {
                         lzham_return(pState, LZHAM_DECOMP_STATUS_FAILED_BAD_CODE);
                      }
-                     
+
                      ptrdiff_t src_ofs = dst_ofs - match_hist0;
                      const uint8* pCopy_src = pDst + src_ofs;
-                                       
+
                      uint8* pCopy_dst = pDst + dst_ofs;
                      if (match_hist0 == 1)
                      {
@@ -985,18 +1019,18 @@ namespace lzham
                         }
                         prev_prev_char = *pCopy_src++;
                         *pCopy_dst++ = static_cast<uint8>(prev_prev_char);
-                        
+
                         prev_char = *pCopy_src++;
                         *pCopy_dst++ = static_cast<uint8>(prev_char);
                      }
                      dst_ofs += match_len;
                   }
                }
-               
-               LZHAM_SYMBOL_CODEC_DECODE_END(codec);     
-               
+
+               LZHAM_SYMBOL_CODEC_DECODE_END(codec);
+
                codec.decode_align_to_byte();
-               
+
                break;
             }
             case CLZBase::cEOFBlock:
@@ -1011,17 +1045,17 @@ namespace lzham
             }
          }
       } while (status == LZHAM_DECOMP_STATUS_NOT_FINISHED);
-                  
+
       if (status == LZHAM_DECOMP_STATUS_SUCCESS)
       {
-         codec.decode_align_to_byte();      
-         
+         codec.decode_align_to_byte();
+
          uint src_file_adler32 = codec.decode_bits(32);
-         
+
          if (pState->m_params.m_compute_adler32)
          {
             pState->m_decomp_adler32 = adler32(pDst, dst_ofs, cInitAdler32);
-            
+
             if (src_file_adler32 != pState->m_decomp_adler32)
             {
                status = LZHAM_DECOMP_STATUS_FAILED_ADLER32;
@@ -1032,10 +1066,10 @@ namespace lzham
             pState->m_decomp_adler32 = src_file_adler32;
          }
       }
-      
+
       *pState->m_pIn_buf_size = static_cast<size_t>(codec.stop_decoding());
       *pState->m_pOut_buf_size = dst_ofs;
-      
+
       lzham_return(pState, status);
    }
 
@@ -1043,8 +1077,8 @@ namespace lzham
    {
       LZHAM_ASSUME(CLZBase::cMinDictSizeLog2 == LZHAM_MIN_DICT_SIZE_LOG2);
       LZHAM_ASSUME(CLZBase::cMaxDictSizeLog2 == LZHAM_MAX_DICT_SIZE_LOG2_X64);
-      
-      if ((!pParams) || (pParams->m_struct_size != sizeof(lzham_decompress_params)))   
+
+      if ((!pParams) || (pParams->m_struct_size != sizeof(lzham_decompress_params)))
          return NULL;
 
       if ((pParams->m_dict_size_log2 < CLZBase::cMinDictSizeLog2) || (pParams->m_dict_size_log2 > CLZBase::cMaxDictSizeLog2))
@@ -1082,10 +1116,16 @@ namespace lzham
          }
          pState->m_pDecomp_buf = math::align_up_pointer(pState->m_pRaw_decomp_buf, 16);
       }
-      
-      pState->m_pWorker_fiber = CreateFiberEx(cFiberStackSize, cFiberStackSize, 0, 
-         pState->m_params.m_output_unbuffered ? (LPFIBER_START_ROUTINE)lzham_decompress_worker_fiber_unbuffered : (LPFIBER_START_ROUTINE)lzham_decompress_worker_fiber_buffered, 
+
+#ifdef LZHAM_PLATFORM_X360
+      pState->m_pWorker_fiber = CreateFiber(cFiberStackSize,
+         pState->m_params.m_output_unbuffered ? (LPFIBER_START_ROUTINE)lzham_decompress_worker_fiber_unbuffered : (LPFIBER_START_ROUTINE)lzham_decompress_worker_fiber_buffered,
          pState);
+#else
+      pState->m_pWorker_fiber = CreateFiberEx(cFiberStackSize, cFiberStackSize, 0,
+         pState->m_params.m_output_unbuffered ? (LPFIBER_START_ROUTINE)lzham_decompress_worker_fiber_unbuffered : (LPFIBER_START_ROUTINE)lzham_decompress_worker_fiber_buffered,
+         pState);
+#endif
 
       if (!pState->m_pWorker_fiber)
       {
@@ -1112,7 +1152,7 @@ namespace lzham
    {
       lzham_decompress_state *pState = static_cast<lzham_decompress_state *>(p);
       if (!pState)
-         return 0;  
+         return 0;
 
       uint32 adler32 = pState->m_decomp_adler32;
 
@@ -1129,14 +1169,14 @@ namespace lzham
 
    lzham_decompress_status_t lzham_lib_decompress(
       lzham_decompress_state_ptr p,
-      const lzham_uint8 *pIn_buf, size_t *pIn_buf_size, 
+      const lzham_uint8 *pIn_buf, size_t *pIn_buf_size,
       lzham_uint8 *pOut_buf, size_t *pOut_buf_size,
       lzham_bool no_more_input_bytes_flag)
    {
       lzham_decompress_state *pState = static_cast<lzham_decompress_state *>(p);
 
-      if ((!pState) || (!pState->m_pPrimary_fiber) || (!pState->m_pWorker_fiber) || (!pState->m_params.m_dict_size_log2) || 
-         (pState->m_status >= LZHAM_DECOMP_STATUS_FIRST_SUCCESS_OR_FAILURE_CODE) || (!pIn_buf_size) || (!pOut_buf_size)) 
+      if ((!pState) || (!pState->m_pPrimary_fiber) || (!pState->m_pWorker_fiber) || (!pState->m_params.m_dict_size_log2) ||
+         (pState->m_status >= LZHAM_DECOMP_STATUS_FIRST_SUCCESS_OR_FAILURE_CODE) || (!pIn_buf_size) || (!pOut_buf_size))
       {
          return LZHAM_DECOMP_STATUS_INVALID_PARAMETER;
       }
@@ -1199,4 +1239,4 @@ namespace lzham
       return status;
    }
 
-} // namespace lzham   
+} // namespace lzham

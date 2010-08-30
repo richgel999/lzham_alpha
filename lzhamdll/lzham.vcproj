@@ -22,7 +22,7 @@
 		<Configuration
 			Name="Debug|Win32"
 			OutputDirectory="$(SolutionDir)lib\x86\$(ConfigurationName)"
-			IntermediateDirectory="lzham\x86\$(ConfigurationName)"
+			IntermediateDirectory="x86\$(ConfigurationName)"
 			ConfigurationType="2"
 			CharacterSet="1"
 			>
@@ -96,7 +96,7 @@
 		<Configuration
 			Name="Debug|x64"
 			OutputDirectory="$(SolutionDir)lib\x64\$(ConfigurationName)"
-			IntermediateDirectory="lzham\x64\$(ConfigurationName)"
+			IntermediateDirectory="x64\$(ConfigurationName)"
 			ConfigurationType="2"
 			CharacterSet="1"
 			>
@@ -171,7 +171,7 @@
 		<Configuration
 			Name="Release|Win32"
 			OutputDirectory="$(SolutionDir)lib\x86\$(ConfigurationName)"
-			IntermediateDirectory="lzham\x86\$(ConfigurationName)"
+			IntermediateDirectory="x86\$(ConfigurationName)"
 			ConfigurationType="2"
 			CharacterSet="1"
 			WholeProgramOptimization="1"
@@ -197,8 +197,12 @@
 				EnableIntrinsicFunctions="true"
 				AdditionalIncludeDirectories="..\include;..\lzhamdecomp;..\lzhamcomp"
 				PreprocessorDefinitions="WIN32;NDEBUG;_WINDOWS;_USRDLL;LZHAM_EXPORTS"
+				ExceptionHandling="0"
 				RuntimeLibrary="0"
+				BufferSecurityCheck="false"
 				EnableFunctionLevelLinking="true"
+				EnableEnhancedInstructionSet="1"
+				FloatingPointModel="2"
 				PrecompiledHeaderThrough=""
 				WarningLevel="4"
 				DebugInformationFormat="3"
@@ -248,7 +252,7 @@
 		<Configuration
 			Name="Release|x64"
 			OutputDirectory="$(SolutionDir)lib\x64\$(ConfigurationName)"
-			IntermediateDirectory="lzham\x64\$(ConfigurationName)"
+			IntermediateDirectory="x64\$(ConfigurationName)"
 			ConfigurationType="2"
 			CharacterSet="1"
 			WholeProgramOptimization="1"
@@ -275,8 +279,11 @@
 				EnableIntrinsicFunctions="true"
 				AdditionalIncludeDirectories="..\include;..\lzhamdecomp;..\lzhamcomp"
 				PreprocessorDefinitions="WIN32;NDEBUG;_WINDOWS;_USRDLL;LZHAM_EXPORTS"
+				ExceptionHandling="0"
 				RuntimeLibrary="0"
+				BufferSecurityCheck="false"
 				EnableFunctionLevelLinking="true"
+				FloatingPointModel="2"
 				PrecompiledHeaderThrough=""
 				WarningLevel="4"
 				DebugInformationFormat="3"

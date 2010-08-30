@@ -40,15 +40,28 @@ namespace lzham
       enum 
       {
          cLZXNumSecondaryLengths = 250,
-         cLZXNumSpecialLengths = 1,
+         cLZXNumSpecialLengths = 2,
          
-         cLowestUsableMatchSlot = 1,
+         cLZXLowestUsableMatchSlot = 1,
          cLZXMaxPositionSlots = 128
+      };
+      
+      enum
+      {
+         cLZXSpecialCodeEndOfBlockCode = 0,
+         cLZXSpecialCodeResetStatePartial = 1
+      };
+      
+      enum
+      {  
+         cLZHAMDebugSyncMarkerValue = 666,
+         cLZHAMDebugSyncMarkerBits = 12
       };
 
       enum
       {
          cBlockHeaderBits = 2,
+         
          cCompBlock = 1,
          cRawBlock = 2,
          cEOFBlock = 3
@@ -103,8 +116,10 @@ namespace lzham
          LZHAM_ASSERT(ofs < (1U << m_lzx_position_extra_bits[slot]));
       }
    };
+         
+   //#define LZVERIFY
    
    //#define LZDEBUG
-   //#define LZVERIFY
+   //#define LZDISABLE_RAW_BLOCKS
 
 } // namespace lzham

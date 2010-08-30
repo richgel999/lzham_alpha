@@ -25,40 +25,53 @@
 
 namespace lzham
 {
+   struct node
+   {
+      uint m_left;
+      uint m_right;
+   };
+   
+   LZHAM_DEFINE_BITWISE_MOVABLE(node);
+   
+#pragma pack(push, 1)      
+   struct dict_match
+   {
+      uint m_dist;
+      uint8 m_len;
+
+      inline uint get_dist() const { return m_dist & 0x7FFFFFFF; }
+      inline uint get_len() const { return m_len + 2; }
+      inline bool is_last() const { return (int)m_dist < 0; }
+   };
+#pragma pack(pop)  
+
+   LZHAM_DEFINE_BITWISE_MOVABLE(dict_match);
+   
    class search_accelerator
    {
    public:
       search_accelerator();
 
+      // If all_matches is true, the match finder returns all found matches with no filtering.
+      // Otherwise, the finder will tend to return lists of matches with mostly unique lengths.
+      // For each length, it will discard matches with worse distances (in the coding sense).
       bool init(CLZBase* pLZBase, task_pool* pPool, uint max_helper_threads, uint max_dict_size, uint max_matches, bool all_matches, uint max_probes);
       
-      uint get_max_dict_size() const { return m_max_dict_size; }
-      uint get_max_dict_size_mask() const { return m_max_dict_size_mask; }
-      uint get_cur_dict_size() const { return m_cur_dict_size; }
+      inline uint get_max_dict_size() const { return m_max_dict_size; }
+      inline uint get_max_dict_size_mask() const { return m_max_dict_size_mask; }
+      inline uint get_cur_dict_size() const { return m_cur_dict_size; }
       
-      uint get_lookahead_pos() const { return m_lookahead_pos; }
-      uint get_lookahead_size() const { return m_lookahead_size; }
+      inline uint get_lookahead_pos() const { return m_lookahead_pos; }
+      inline uint get_lookahead_size() const { return m_lookahead_size; }
       
-      uint get_char(int delta_pos) const { return m_dict[(m_lookahead_pos + delta_pos) & m_max_dict_size_mask]; }
-      const uint8* get_ptr(uint pos) const { return &m_dict[pos]; }
+      inline uint get_char(int delta_pos) const { return m_dict[(m_lookahead_pos + delta_pos) & m_max_dict_size_mask]; }
+      inline const uint8* get_ptr(uint pos) const { return &m_dict[pos]; }
       
-      uint operator[](uint pos) const { return m_dict[pos]; }
+      inline uint operator[](uint pos) const { return m_dict[pos]; }
             
       uint get_max_add_bytes() const;
       void add_bytes_begin(uint num_bytes, const uint8* pBytes);
       void add_bytes_end();
-            
-#pragma pack(push, 1)      
-      struct dict_match
-      {
-         uint m_dist;
-         uint8 m_len;
-         
-         inline uint get_dist() const { return m_dist & 0x7FFFFFFF; }
-         inline uint get_len() const { return m_len + 2; }
-         inline bool is_last() const { return (int)m_dist < 0; }
-      };
-#pragma pack(pop)       
 
       dict_match* find_matches(uint lookahead_ofs, bool spin = true);
       
@@ -83,12 +96,7 @@ namespace lzham
       
       enum { cHashSize = 65536 };
       lzham::vector<uint> m_hash;
-      
-      struct node
-      {
-         uint m_left;
-         uint m_right;
-      };
+
       lzham::vector<node> m_nodes;
 
       lzham::vector<dict_match> m_matches;

@@ -35,6 +35,8 @@ namespace lzham
    {
       T* p = static_cast<T*>(lzham_malloc(sizeof(T)));
       if (!p) return NULL;
+      if (LZHAM_IS_SCALAR_TYPE(T))
+         return p;
       return helpers::construct(p);
    }
      
@@ -84,7 +86,10 @@ namespace lzham
       reinterpret_cast<uint32*>(p)[-1] = num;
       reinterpret_cast<uint32*>(p)[-2] = ~num;
 
-      helpers::construct_array(p, num);
+      if (!LZHAM_IS_SCALAR_TYPE(T))
+      {
+         helpers::construct_array(p, num);
+      }
       return p;
    }
 
@@ -93,7 +98,10 @@ namespace lzham
    {
       if (p) 
       {
-         helpers::destruct(p);
+         if (!LZHAM_IS_SCALAR_TYPE(T))
+         {
+            helpers::destruct(p);
+         }
          lzham_free(p);
       }         
    }
@@ -108,7 +116,10 @@ namespace lzham
          LZHAM_ASSERT(num && (num == ~num_check));
          if (num == ~num_check)
          {
-            helpers::destruct_array(p, num);
+            if (!LZHAM_IS_SCALAR_TYPE(T))
+            {
+               helpers::destruct_array(p, num);
+            }
 
             lzham_free(reinterpret_cast<uint8*>(p) - LZHAM_MIN_ALLOC_ALIGNMENT);
          }

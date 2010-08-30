@@ -23,19 +23,26 @@
 
 // Upper byte = major version
 // Lower byte = minor version
-#define LZHAM_DLL_VERSION        0x1002
+#define LZHAM_DLL_VERSION        0x1003
 
-#ifdef _WIN64
-   #define LZHAM_DLL_FILENAME       L"lzham_x64.dll"
-   #define LZHAM_DEBUG_DLL_FILENAME L"lzham_x64D.dll"
+#ifdef _XBOX
+   #define LZHAM_DLL_FILENAME       "lzham_x360.dll"
+   #define LZHAM_DEBUG_DLL_FILENAME "lzham_x360D.dll"
 #else
-   #define LZHAM_DLL_FILENAME       L"lzham_x86.dll"
-   #define LZHAM_DEBUG_DLL_FILENAME L"lzham_x86D.dll"
+   // Under Win32, the path helpers are currently hardcoded to use Unicode, which is probably bad for some folks.
+   // This stuff should probably be moved to another header.
+   #ifdef _WIN64
+      #define LZHAM_DLL_FILENAME       L"lzham_x64.dll"
+      #define LZHAM_DEBUG_DLL_FILENAME L"lzham_x64D.dll"
+   #else
+      #define LZHAM_DLL_FILENAME       L"lzham_x86.dll"
+      #define LZHAM_DEBUG_DLL_FILENAME L"lzham_x86D.dll"
+   #endif
 #endif
 
 #ifdef LZHAM_EXPORTS
    #define LZHAM_DLL_EXPORT __declspec(dllexport)
-#elif !defined(LZHAM_STATIC_LIB)
+#elif !defined(LZHAM_STATIC_LIB) && !defined(_XBOX)
    #define LZHAM_DLL_EXPORT __declspec(dllimport)
 #else
    #define LZHAM_DLL_EXPORT
@@ -48,24 +55,26 @@ extern "C" {
    typedef unsigned char   lzham_uint8;
    typedef unsigned int    lzham_uint32;
    typedef unsigned int    lzham_bool;
-   
+
    // Returns DLL version.
    LZHAM_DLL_EXPORT lzham_uint32 lzham_get_version(void);
-   
+
    // User provided memory allocation
-   
+
    // Custom allocation function must return pointers with LZHAM_MIN_ALLOC_ALIGNMENT (or better).
    #define LZHAM_MIN_ALLOC_ALIGNMENT sizeof(size_t) * 2
 
    typedef void*  (*lzham_realloc_func)(void* p, size_t size, size_t* pActual_size, bool movable, void* pUser_data);
    typedef size_t (*lzham_msize_func)(void* p, void* pUser_data);
-         
+
    LZHAM_DLL_EXPORT void lzham_set_memory_callbacks(lzham_realloc_func pRealloc, lzham_msize_func pMSize, void* pUser_data);
 
    // Compression
    #define LZHAM_MIN_DICT_SIZE_LOG2 15
    #define LZHAM_MAX_DICT_SIZE_LOG2_X86 26
    #define LZHAM_MAX_DICT_SIZE_LOG2_X64 29
+   
+   #define LZHAM_MAX_HELPER_THREADS 16
 
    enum lzham_compress_status_t
    {
@@ -92,6 +101,8 @@ extern "C" {
       LZHAM_COMP_LEVEL_DEFAULT,
       LZHAM_COMP_LEVEL_BETTER,
       LZHAM_COMP_LEVEL_UBER,
+      
+      LZHAM_TOTAL_COMP_LEVELS,
 
       LZHAM_COMP_LEVEL_FORCE_DWORD = 0xFFFFFFFF
    };
@@ -112,21 +123,21 @@ extern "C" {
 
    // returns adler32 of source data (valid only on success).
    LZHAM_DLL_EXPORT lzham_uint32 lzham_compress_deinit(lzham_compress_state_ptr pState);
-      
+
    LZHAM_DLL_EXPORT lzham_compress_status_t lzham_compress(
       lzham_compress_state_ptr pState,
-      const lzham_uint8 *pIn_buf, size_t *pIn_buf_size, 
+      const lzham_uint8 *pIn_buf, size_t *pIn_buf_size,
       lzham_uint8 *pOut_buf, size_t *pOut_buf_size,
       lzham_bool no_more_input_bytes_flag);
 
    // single call interface
-   
+
    LZHAM_DLL_EXPORT lzham_compress_status_t lzham_compress_memory(
-      const lzham_compress_params *pParams, 
-      lzham_uint8* pDst_buf, 
-      size_t *pDst_len, 
-      const lzham_uint8* pSrc_buf, 
-      size_t src_len, 
+      const lzham_compress_params *pParams,
+      lzham_uint8* pDst_buf,
+      size_t *pDst_len,
+      const lzham_uint8* pSrc_buf,
+      size_t src_len,
       lzham_uint32 *pAdler32);
 
    // Decompression
@@ -166,22 +177,22 @@ extern "C" {
 
    LZHAM_DLL_EXPORT lzham_decompress_status_t lzham_decompress(
       lzham_decompress_state_ptr pState,
-      const lzham_uint8 *pIn_buf, size_t *pIn_buf_size, 
+      const lzham_uint8 *pIn_buf, size_t *pIn_buf_size,
       lzham_uint8 *pOut_buf, size_t *pOut_buf_size,
       lzham_bool no_more_input_bytes_flag);
 
    // single call interface
    LZHAM_DLL_EXPORT lzham_decompress_status_t lzham_decompress_memory(
-      const lzham_decompress_params *pParams, 
-      lzham_uint8* pDst_buf, 
-      size_t *pDst_len, 
-      const lzham_uint8* pSrc_buf, 
-      size_t src_len, 
+      const lzham_decompress_params *pParams,
+      lzham_uint8* pDst_buf,
+      size_t *pDst_len,
+      const lzham_uint8* pSrc_buf,
+      size_t src_len,
       lzham_uint32 *pAdler32);
 
    // Exported function typedefs, to simplify loading the LZHAM DLL dynamically.
    typedef lzham_uint32 (*lzham_get_version_func)(void);
-   typedef void (*lzham_set_memory_callbacks_func)(lzham_realloc_func pRealloc, lzham_msize_func pMSize, void* pUser_data);      
+   typedef void (*lzham_set_memory_callbacks_func)(lzham_realloc_func pRealloc, lzham_msize_func pMSize, void* pUser_data);
    typedef lzham_compress_state_ptr (*lzham_compress_init_func)(const lzham_compress_params *pParams);
    typedef lzham_uint32 (*lzham_compress_deinit_func)(lzham_compress_state_ptr pState);
    typedef lzham_compress_status_t (*lzham_compress_func)(lzham_compress_state_ptr pState, const lzham_uint8 *pIn_buf, size_t *pIn_buf_size, lzham_uint8 *pOut_buf, size_t *pOut_buf_size, lzham_bool no_more_input_bytes_flag);
@@ -189,8 +200,8 @@ extern "C" {
    typedef lzham_decompress_state_ptr (*lzham_decompress_init_func)(const lzham_decompress_params *pParams);
    typedef lzham_uint32 (*lzham_decompress_deinit_func)(lzham_decompress_state_ptr pState);
    typedef lzham_decompress_status_t (*lzham_decompress_func)(lzham_decompress_state_ptr pState, const lzham_uint8 *pIn_buf, size_t *pIn_buf_size, lzham_uint8 *pOut_buf, size_t *pOut_buf_size, lzham_bool no_more_input_bytes_flag);
-   typedef lzham_decompress_status_t (*lzham_decompress_memory_func)(const lzham_decompress_params *pParams, lzham_uint8* pDst_buf, size_t *pDst_len, const lzham_uint8* pSrc_buf, size_t src_len, lzham_uint32 *pAdler32);   
-   
+   typedef lzham_decompress_status_t (*lzham_decompress_memory_func)(const lzham_decompress_params *pParams, lzham_uint8* pDst_buf, size_t *pDst_len, const lzham_uint8* pSrc_buf, size_t src_len, lzham_uint32 *pAdler32);
+
 #ifdef __cplusplus
 }
 #endif
@@ -201,58 +212,80 @@ class lzham_dll_loader
 {
    lzham_dll_loader(const lzham_dll_loader &other);
    lzham_dll_loader& operator= (const lzham_dll_loader &rhs);
-   
+
 public:
    inline lzham_dll_loader()
    {
       memset(this, 0, sizeof(*this));
    }
-   
+
    ~lzham_dll_loader()
    {
       unload();
    }
 
-   enum 
-   { 
+   enum
+   {
       cErrorMissingExport = MAKE_HRESULT(SEVERITY_ERROR, FACILITY_ITF, 0x201),
       cErrorUnsupportedDLLVersion = MAKE_HRESULT(SEVERITY_ERROR, FACILITY_ITF, 0x202),
    };
-   
+
+   // Assumes LZHAM DLL is in the same path as the executable.
+#ifdef _XBOX
+   static void create_module_path(char *pModulePath, int size_in_chars, bool debug_dll)
+   {
+      char *buf = "D:\\unused.xex";
+      char drive_buf[_MAX_DRIVE];
+      char dir_buf[_MAX_DIR];
+      char filename_buf[_MAX_FNAME];
+      char ext_buf[_MAX_EXT];
+      _splitpath_s(buf, drive_buf, _MAX_DRIVE, dir_buf, _MAX_DIR, NULL, 0, NULL, 0);
+      _splitpath_s(debug_dll ? LZHAM_DEBUG_DLL_FILENAME : LZHAM_DLL_FILENAME, NULL, 0, NULL, 0, filename_buf, _MAX_FNAME, ext_buf, _MAX_EXT);
+      _makepath_s(pModulePath, size_in_chars, drive_buf, dir_buf, filename_buf, ext_buf);
+   }
+#elif defined(_MSC_VER)
    static void create_module_path(wchar_t *pModulePath, int size_in_chars, bool debug_dll)
    {
-      // Assumes LZHAM DLL is in the same path as the executable.
       wchar_t buf[MAX_PATH];
       GetModuleFileNameW(NULL, buf, sizeof(buf));
-
-      wchar_t drive_buf[_MAX_DRIVE];
-      wchar_t dir_buf[_MAX_DIR];
-      wchar_t filename_buf[_MAX_FNAME];
-      wchar_t ext_buf[_MAX_EXT];
+      wchar_t drive_buf[_MAX_DRIVE], dir_buf[_MAX_DIR], filename_buf[_MAX_FNAME], ext_buf[_MAX_EXT];
       _wsplitpath_s(buf, drive_buf, _MAX_DRIVE, dir_buf, _MAX_DIR, NULL, 0, NULL, 0);
       _wsplitpath_s(debug_dll ? LZHAM_DEBUG_DLL_FILENAME : LZHAM_DLL_FILENAME, NULL, 0, NULL, 0, filename_buf, _MAX_FNAME, ext_buf, _MAX_EXT);
-      
       _wmakepath_s(pModulePath, size_in_chars, drive_buf, dir_buf, filename_buf, ext_buf);
    }
+#else
+   static void create_module_path(wchar_t *pModulePath, int size_in_chars, bool debug_dll)
+   {
+      wcscpy(pModulePath, debug_dll ? LZHAM_DEBUG_DLL_FILENAME : LZHAM_DLL_FILENAME);
+   }
+#endif
 
+#ifdef _XBOX
+   HRESULT load(const char* pModulePath)
+#else
    HRESULT load(const wchar_t* pModulePath)
+#endif
    {
       unload();
-      
+
+#ifdef _XBOX
+      m_handle = LoadLibraryA(pModulePath);
+#else
       m_handle = LoadLibraryW(pModulePath);
+#endif
       if (NULL == m_handle)
       {
          return HRESULT_FROM_WIN32(GetLastError());
       }
 
-      struct 
+      struct
       {
          const char* pName;
          void** pFunc_ptr;
       }
-      funcs[] = 
+      funcs[] =
       {
-#define LZHAM_DLL_FUNC_NAME(x) { #x, (void**)&x },      
+#define LZHAM_DLL_FUNC_NAME(x) { #x, (void**)&x },
 #include "lzham_exports.inc"
 #undef LZHAM_DLL_FUNC_NAME
       };
@@ -261,13 +294,17 @@ public:
 
       for (int i = 0; i < cNumFuncs; i++)
       {
-         if ((*funcs[i].pFunc_ptr = GetProcAddress(m_handle, funcs[i].pName)) == NULL)
+#ifdef _XBOX
+         if ((*funcs[i].pFunc_ptr = GetProcAddress(m_handle, (LPCSTR)(i + 1))) == NULL)
+#else      
+         if ((*funcs[i].pFunc_ptr = (void*)GetProcAddress(m_handle, funcs[i].pName)) == NULL)
+#endif         
          {
             unload();
             return cErrorMissingExport;
          }
       }
-      
+
       int dll_ver = lzham_get_version();
 
       // Ensure DLL's major version is the expected version.
@@ -276,10 +313,10 @@ public:
          unload();
          return cErrorUnsupportedDLLVersion;
       }
-      
+
       return S_OK;
    }
-   
+
    void unload()
    {
       if (m_handle)

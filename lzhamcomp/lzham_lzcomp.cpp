@@ -62,7 +62,7 @@ namespace lzham
       }
          
       params.m_dict_size_log2 = pParams->m_dict_size_log2;
-      params.m_max_helper_threads = LZHAM_MIN(16, pParams->m_max_helper_threads);
+      params.m_max_helper_threads = LZHAM_MIN(LZHAM_MAX_HELPER_THREADS, pParams->m_max_helper_threads);
       params.m_num_cachelines = pParams->m_cpucache_total_lines;
       params.m_cacheline_size = pParams->m_cpucache_line_size;
       
