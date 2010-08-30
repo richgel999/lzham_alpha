@@ -32,9 +32,9 @@ bool lzham_is_debugger_present(void)
 {
 #ifdef LZHAM_PLATFORM_X360
    return DmIsDebuggerPresent() != 0;
-#else	
+#else
    return IsDebuggerPresent() != 0;
-#endif	   
+#endif
 }
 
 void lzham_debug_break(void)
@@ -47,3 +47,22 @@ void lzham_output_debug_string(const char* p)
    OutputDebugStringA(p);
 }
 
+#ifdef __GNUC__
+int sprintf_s(char *buffer, size_t sizeOfBuffer, const char *format, ...)
+{
+   if (!sizeOfBuffer)
+      return 0;
+
+   va_list args;
+   va_start(args, format);
+   int c = vsnprintf(buffer, sizeOfBuffer, format, args);
+   va_end(args);
+
+   buffer[sizeOfBuffer - 1] = '\0';
+
+   if (c < 0)
+      return sizeOfBuffer - 1;
+
+   return LZHAM_MIN(c, (int)sizeOfBuffer - 1);
+}
+#endif

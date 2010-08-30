@@ -23,16 +23,18 @@
 
 #ifdef LZHAM_PLATFORM_PC
    const bool c_lzham_little_endian_platform = true;
+   #define LZHAM_LITTLE_ENDIAN_CPU 1
 #else
    const bool c_lzham_little_endian_platform = false;
-#endif   
+   #define LZHAM_BIG_ENDIAN_CPU 1
+#endif
 
 const bool c_lzham_big_endian_platform = !c_lzham_little_endian_platform;
 
 inline bool lzham_is_little_endian() { return c_lzham_little_endian_platform; }
 inline bool lzham_is_big_endian() { return c_lzham_big_endian_platform; }
 
-inline bool lzham_is_xbox() 
+inline bool lzham_is_xbox()
 {
 #ifdef LZHAM_PLATFORM_X360
    return true;
@@ -41,7 +43,7 @@ inline bool lzham_is_xbox()
 #endif
 }
 
-inline bool lzham_is_pc() 
+inline bool lzham_is_pc()
 {
 #ifdef LZHAM_PLATFORM_PC
    return true;
@@ -50,7 +52,7 @@ inline bool lzham_is_pc()
 #endif
 }
 
-inline bool lzham_is_x86() 
+inline bool lzham_is_x86()
 {
 #ifdef LZHAM_PLATFORM_PC_X86
    return true;
@@ -59,7 +61,7 @@ inline bool lzham_is_x86()
 #endif
 }
 
-inline bool lzham_is_x64() 
+inline bool lzham_is_x64()
 {
 #ifdef LZHAM_PLATFORM_PC_X64
    return true;
@@ -82,13 +84,37 @@ inline void lzham_yield_processor()
    #if defined ( LZHAM_PLATFORM_PC_X64 )
       _mm_pause();
    #elif defined( LZHAM_PLATFORM_PC_X86 )
-      __asm pause;
+      YieldProcessor();
    #elif defined( LZHAM_PLATFORM_X360 )
-      YieldProcessor(); 
-      __asm { or r0,r0,r0 } 
-      YieldProcessor(); 
-      __asm { or r1,r1,r1 } 
+      YieldProcessor();
+      __asm { or r0, r0, r0 }
+      YieldProcessor();
+      __asm { or r1, r1, r1 }
    #else
       #error Unimplemented!
    #endif
 }
+
+#ifdef __GNUC__
+int sprintf_s(char *buffer, size_t sizeOfBuffer, const char *format, ...);
+#endif
+
+#if ( defined(_MSC_VER) && !defined(LZHAM_PLATFORM_X360) ) || defined(__MINGW32__) || defined(__MINGW64__)
+   #define LZHAM_USE_X86_INTRINSICS 1
+#endif
+
+#define LZHAM_FORCE_INLINE __forceinline
+
+#ifdef PLATFORM_X360
+   #define LZHAM_MEMORY_EXPORT_BARRIER MemoryBarrier();
+#else   
+   // Barriers shouldn't be necessary on x86/x64.
+   #define LZHAM_MEMORY_EXPORT_BARRIER
+#endif
+
+#ifdef PLATFORM_X360
+   #define LZHAM_MEMORY_IMPORT_BARRIER MemoryBarrier();
+#else   
+   // Barriers shouldn't be necessary on x86/x64.
+   #define LZHAM_MEMORY_IMPORT_BARRIER
+#endif

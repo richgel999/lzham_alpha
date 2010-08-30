@@ -31,8 +31,14 @@ namespace lzham
    typedef unsigned int       uint32;
    typedef uint32             uint;
    typedef signed int         int32;
-   typedef unsigned __int64   uint64;
-   typedef signed __int64     int64;
+
+   #ifdef __GNUC__
+      typedef unsigned long long    uint64;
+      typedef long long             int64;
+   #else
+      typedef unsigned __int64      uint64;
+      typedef signed __int64        int64;
+   #endif
 
    const uint8  UINT8_MIN  = 0;
    const uint8  UINT8_MAX  = 0xFFU;
@@ -42,15 +48,15 @@ namespace lzham
    const uint32 UINT32_MAX = 0xFFFFFFFFU;
    const uint64 UINT64_MIN = 0;
    const uint64 UINT64_MAX = 0xFFFFFFFFFFFFFFFFULL;    //0xFFFFFFFFFFFFFFFFui64;
-   
+
    const int8  INT8_MIN  = -128;
    const int8  INT8_MAX  = 127;
    const int16 INT16_MIN = -32768;
    const int16 INT16_MAX = 32767;
    const int32 INT32_MIN = (-2147483647 - 1);
    const int32 INT32_MAX = 2147483647;
-   const int64 INT64_MIN = (-9223372036854775807i64 - 1);
-   const int64 INT64_MAX = 9223372036854775807i64;
+   const int64 INT64_MIN = (int64)0x8000000000000000ULL; //(-9223372036854775807i64 - 1);
+   const int64 INT64_MAX = (int64)0x7FFFFFFFFFFFFFFFULL; //9223372036854775807i64;
 
 #ifdef LZHAM_PLATFORM_PC_X64
    typedef unsigned __int64 uint_ptr;
@@ -66,23 +72,23 @@ namespace lzham
    const ptr_bits_t PTR_BITS_XOR = 0x5C87DCF7UL;
 #endif
    #define LZHAM_LOWEST_USABLE_ADDRESS ((void*)0x10000)
-   
+
    enum
    {
       cInvalidIndex = -1
    };
-   
+
    const uint cIntBits = sizeof(uint) * CHAR_BIT;
-      
+
    template<typename T> struct int_traits { enum { cMin = INT_MIN, cMax = INT_MAX, cSigned = true }; };
    template<> struct int_traits<int8> { enum { cMin = INT8_MIN, cMax = INT8_MAX, cSigned = true }; };
    template<> struct int_traits<int16> { enum { cMin = INT16_MIN, cMax = INT16_MAX, cSigned = true }; };
    template<> struct int_traits<int32> { enum { cMin = INT32_MIN, cMax = INT32_MAX, cSigned = true }; };
-      
+
    template<> struct int_traits<uint> { enum { cMin = 0, cMax = UINT_MAX, cSigned = false }; };
    template<> struct int_traits<uint8> { enum { cMin = 0, cMax = UINT8_MAX, cSigned = false }; };
    template<> struct int_traits<uint16> { enum { cMin = 0, cMax = UINT16_MAX, cSigned = false }; };
-   
+
    struct empty_type { };
-            
+
 } // namespace lzham

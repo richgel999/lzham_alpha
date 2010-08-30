@@ -24,13 +24,13 @@
 
 namespace lzham
 {
-   waitable_lock::waitable_lock(uint spin_count) : 
-      m_cur_age(0), 
-      m_max_waiter_array_index(-1),
-      m_waitable_lock_lock(1, 1)
+   waitable_lock::waitable_lock(uint spin_count) :
+      m_waitable_lock_lock(1, 1),
+      m_cur_age(0),
+      m_max_waiter_array_index(-1)
    {
       m_waiters_array_lock.set_spin_count(spin_count);
-      
+
       for (uint i = 0; i < cMaxWaitingThreads; i++)
          m_waiters[i].clear();
    }
@@ -39,18 +39,18 @@ namespace lzham
    {
    }
 
-   void waitable_lock::lock() 
-   { 
+   void waitable_lock::lock()
+   {
       m_waitable_lock_lock.wait();
    }
 
-   void waitable_lock::unlock() 
-   { 
-      find_ready_waiter_or_unlock(-1, false); 
+   void waitable_lock::unlock()
+   {
+      find_ready_waiter_or_unlock(-1, false);
    }
 
    int waitable_lock::wait(
-     pCondition_func pCallback, void* pCallback_data_ptr, uint64 callback_data, 
+     pCondition_func pCallback, void* pCallback_data_ptr, uint64 callback_data,
      uint num_wait_handles, const HANDLE* pWait_handles, DWORD max_time_to_wait)
    {
       LZHAM_ASSERT(pCallback);
@@ -66,7 +66,7 @@ namespace lzham
       for (i = 0; i < cMaxWaitingThreads; i++)
          if (!m_waiters[i].m_occupied)
             break;
-      
+
       LZHAM_ASSERT(i != cMaxWaitingThreads);
       if (i == cMaxWaitingThreads)
       {
@@ -75,7 +75,7 @@ namespace lzham
       }
 
       m_max_waiter_array_index = math::maximum<int>(m_max_waiter_array_index, i);
-      
+
       waiting_thread& waiter_entry = m_waiters[i];
 
       waiter_entry.m_callback_func     = pCallback;
@@ -84,7 +84,7 @@ namespace lzham
       waiter_entry.m_satisfied         = false;
       waiter_entry.m_occupied          = true;
       waiter_entry.m_age               = m_cur_age++;
-            
+
       // Now leave the lock and scan to see if there are any satisfied waiters.
       find_ready_waiter_or_unlock(i, true);
 
@@ -95,9 +95,9 @@ namespace lzham
       LZHAM_ASSERT(num_wait_handles < cMaxWaitHandles);
 
       HANDLE handles[cMaxWaitHandles];
-      
+
       handles[0] = waiter_entry.m_ready.get_handle();
-      uint total_handles = 1;      
+      uint total_handles = 1;
 
       if (num_wait_handles)
       {
@@ -107,20 +107,20 @@ namespace lzham
       }
 
       DWORD result = WaitForMultipleObjects(total_handles, handles, FALSE, max_time_to_wait);
-         
+
       if ((result == WAIT_ABANDONED) || (result == WAIT_TIMEOUT))
       {
          return_index = -1;
       }
       else
-      { 
+      {
          return_index = result - WAIT_OBJECT_0;
       }
 
       // See if our condition was satisfied, and remove this thread from the waiter list.
       m_waiters_array_lock.lock();
 
-      const bool was_satisfied = waiter_entry.m_satisfied;                          
+      const bool was_satisfied = waiter_entry.m_satisfied;
 
       waiter_entry.m_occupied = false;
 
@@ -128,13 +128,13 @@ namespace lzham
 
       if (0 == return_index)
       {
-         LZHAM_ASSERT(was_satisfied);  
+         LZHAM_ASSERT(was_satisfied);
       }
       else
       {
          // This is tricky. Re-enter the waitable_lock if a user supplied handle was signaled, or if we've timed out.
-         // This guarantees that on exit of this function we're still inside the lock, 
-         // no matter what happened during or immediately after the WaitForMultipleObjects() call (we may have been 
+         // This guarantees that on exit of this function we're still inside the lock,
+         // no matter what happened during or immediately after the WaitForMultipleObjects() call (we may have been
          // given ownership of the lock shortly after a user-provided handle became signaled).
          // Note: This codepath is not well tested in the LZHAM lib as of 7/25/10.
          if (!was_satisfied)
@@ -149,7 +149,7 @@ namespace lzham
          }
       }
 
-      return return_index;                
+      return return_index;
    }
 
    void waitable_lock::find_ready_waiter_or_unlock(int index_to_ignore, bool already_inside_waiter_array_lock)
@@ -158,7 +158,7 @@ namespace lzham
       {
          m_waiters_array_lock.lock();
       }
-      
+
       uint best_age = 0;
       int best_index = -1;
       for (int i = 0; i <= m_max_waiter_array_index; i++)
@@ -168,7 +168,7 @@ namespace lzham
          if ((i != index_to_ignore) && (waiter_entry.m_occupied) && (!waiter_entry.m_satisfied))
          {
             uint age = m_cur_age - waiter_entry.m_age;
-            
+
             if ((age > best_age) || (best_index < 0))
             {
                if (waiter_entry.m_callback_func(waiter_entry.m_pCallback_ptr, waiter_entry.m_callback_data))
@@ -176,19 +176,19 @@ namespace lzham
                   best_age = age;
                   best_index = i;
                }
-            }               
-         }            
+            }
+         }
       }
-      
+
       if (best_index >= 0)
       {
          // We've found a waiter who's condition is satisfied, so wake it up.
          waiting_thread& waiter_entry = m_waiters[best_index];
-         
+
          waiter_entry.m_satisfied = true;
-         
+
          waiter_entry.m_ready.release();
-         
+
          m_waiters_array_lock.unlock();
       }
       else
@@ -197,7 +197,7 @@ namespace lzham
 
          // Couldn't find any waiting threads to wake up, so leave the lock.
          m_waitable_lock_lock.release();
-      }         
+      }
    }
 
 } // namespace lzham
