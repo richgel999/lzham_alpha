@@ -70,7 +70,7 @@ Decompression only time (not counting decompression init or I/O): 8.798123
 
 *Compression Speed*
 
-LZHAM's compressor in "uber" mode is now reasonably fast on modern multicore processors (around 1-3MB/sec. depending on the file), but it still uses relatively more total CPU time vs. LZMA. This is partially on purpose, because LZHAM tries to make up for its relatively weaker coding scheme vs. LZMA's all-arithmetic coder by using good parsing and higher order context modeling. But fundamentally, LZMA's parser efficiency is very impressive (and still mostly a mystery to me).
+LZHAM's compressor in "uber" mode is now reasonably fast on modern multicore processors (around 1-3MB/sec. depending on the file), but it still uses relatively more total CPU time vs. LZMA. This is partially on purpose, because LZHAM tries to make up for its relatively weaker (but faster to decode) coding scheme vs. LZMA's all-arithmetic coder by using good parsing and higher order context modeling. But fundamentally, LZMA's parser efficiency is very impressive (and still mostly a mystery to me).
 
 Example: LZHAM x64 took 48.28 seconds to compress enwik8, but it used 8 total threads to do so. LZHAM x86 took 55.34 seconds (also using 8 total threads). By comparison, as far as I know 7za (7zip command line) only uses a single helper thread and took 69.15 seconds to compress the same file:
 
