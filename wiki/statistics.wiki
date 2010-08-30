@@ -18,9 +18,13 @@ lzturbo now beats LZHAM on enwik9, but lzturbo is still very slightly ahead on e
   * lzturbo 0.94 enwik8: 24,763,542  
   * lzturbo 0.94 enwik9: 217,342,694
 
-7-zip command line (7za) 4.65 statics:
+7-zip 4.65 command line (7za) 4.65 statistics:
   * 7za -mx9 enwik8: 24,861,205
-  * 7za -mx9 enwik9: TBD
+  * 7za -mx9 enwik9: 213,336,006
+
+7-zip 9.09 GUI x64 using 512MB dictionary/ultra:
+   * 7zip x64 512MB: enwik8: 24,797,848
+   * 7zip x64 512MB: enwik9: 202,900,157
 
 Here's the output from the lzhamtest_x64 running under Win7 x64 on a 2.6 GHz Core i7 with 6MB RAM:
 
@@ -66,9 +70,11 @@ Decompression only time (not counting decompression init or I/O): 8.798123
 
 *Compression Speed*
 
-LZHAM's compressor is now reasonably fast on multicore processors, but it still uses relatively more total CPU time vs. LZMA. This is partially on purpose, because LZHAM makes up for its weaker coding scheme (vs. LZMA's all-arithmetic coding) by using a strong optimal parser. (But fundamentally, the LZMA parser's efficiency is very impressive, and still mostly a mystery to me.)
+LZHAM's compressor in "uber" mode is now reasonably fast on modern multicore processors (around 1.2-3MB/sec. depending on the file), but it still uses relatively more total CPU time vs. LZMA. This is partially on purpose, because LZHAM makes up for its weaker coding scheme vs. LZMA's all-arithmetic coder by using a strong optimal parser. But fundamentally, LZMA's parser efficiency is very impressive (and still mostly a mystery to me).
 
-Example: LZHAM x64 took 48.28 seconds to compress enwik8, but it used 8 helper threads to do so. By comparison, as far as I know 7za x86 only uses a single helper thread and took 69.15 seconds to compress the same file:
+Example: LZHAM x64 took 48.28 seconds to compress enwik8, but it used 8 helper threads to do so. LZHAM x86 took 55.34 seconds (again with 8 helper threads). By comparison, as far as I know 7za (7zip command line) only uses a single helper thread and took 69.15 seconds to compress the same file:
+
+7za enwik8:
 
 {{{
 E:\lzham\lzham_alpha3_head2\bin>timer 7za a -mx9 d E:\dev\corpus\enwik8\enwik8
@@ -88,4 +94,40 @@ Kernel Time  =     0.561 = 00:00:00.561 =   0%
 User Time    =   100.995 = 00:01:40.995 = 146%
 Process Time =   101.556 = 00:01:41.556 = 146%
 Global Time  =    69.151 = 00:01:09.151 = 100%
+}}}
+
+For an apples to apples comparison, here's lzhamtest_x86 compressing the same file. LZHAM only took 55.4s vs. 7za's 69.1s, but it used 3x as much processor time: 
+
+lzhamtest_x86:
+
+{{{
+E:\lzham\lzham_alpha3_head2\bin>timer lzhamtest_x86 c E:\dev\corpus\enwik8\enwik8 1
+
+Timer 8.00 : Igor Pavlov : Public domain : 2008-11-25
+LZHAM Codec - x86 Command Line Test App - Compiled Aug 30 2010 01:57:59
+Expecting LZHAM DLL Version 0x1003
+Dynamically loading DLL "E:\lzham\lzham_alpha3_head2\bin\lzham_x86.dll"
+Loaded LZHAM DLL version 0x1003
+
+Using options:
+Comp level: 4
+Dict size: 26 (67108864 bytes)
+Compute adler32 during decompression: 1
+Max helper threads: 7
+Unbuffered decompression: 0
+Verify compressed data: 0
+Randomize parameters: 0
+
+Testing: Streaming compression
+lzham_compress_init took 7.334ms
+Success
+Input file size: 100000000, Compressed file size: 25013133, Ratio: 74.99%
+Compression time: 55.343016
+Consumption rate: 1806912.7 bytes/sec, Emission rate:  451965.5 bytes/sec
+Input file adler32: 0x72DB5861
+
+Kernel Time  =     0.592 = 00:00:00.592 =   1%
+User Time    =   319.599 = 00:05:19.599 = 576%
+Process Time =   320.192 = 00:05:20.192 = 577%
+Global Time  =    55.444 = 00:00:55.444 = 100%
 }}}
