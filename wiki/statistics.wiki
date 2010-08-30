@@ -18,6 +18,10 @@ lzturbo now beats LZHAM on enwik9, but lzturbo is still very slightly ahead on e
   * lzturbo 0.94 enwik8: 24,763,542  
   * lzturbo 0.94 enwik9: 217,342,694
 
+7-zip command line (7za) 4.65 statics:
+  * 7za -mx9 enwik8: 24,861,205
+  * 7za -mx9 enwik9: TBD
+
 Here's the output from the lzhamtest_x64 running under Win7 x64 on a 2.6 GHz Core i7 with 6MB RAM:
 
 {{{
@@ -58,4 +62,30 @@ Overall decompression time (decompression init+I/O+decompression): 9.242904
   Consumption rate: 22329974.8 bytes/sec, Decompression rate: 108191107.7 bytes/sec
 Decompression only time (not counting decompression init or I/O): 8.798123
   Consumption rate: 23458845.1 bytes/sec, Decompression rate: 113660604.6 bytes/sec
+}}}
+
+*Compression Speed*
+
+LZHAM's compressor is now reasonably fast on multicore processors, but it still uses relatively more total CPU time vs. LZMA. This is partially on purpose, because LZHAM makes up for its weaker coding scheme (vs. LZMA's all-arithmetic coding) by using a strong optimal parser. (But fundamentally, the LZMA parser's efficiency is very impressive, and still mostly a mystery to me.)
+
+Example: LZHAM x64 took 48.28 seconds to compress enwik8, but it used 8 helper threads to do so. By comparison, as far as I know 7za x86 only uses a single helper thread and took 69.15 seconds to compress the same file:
+
+{{{
+E:\lzham\lzham_alpha3_head2\bin>timer 7za a -mx9 d E:\dev\corpus\enwik8\enwik8
+
+Timer 8.00 : Igor Pavlov : Public domain : 2008-11-25
+
+7-Zip (A) 4.65  Copyright (c) 1999-2009 Igor Pavlov  2009-02-03
+Scanning
+
+Creating archive d.7z
+
+Compressing  enwik8
+
+Everything is Ok
+
+Kernel Time  =     0.561 = 00:00:00.561 =   0%
+User Time    =   100.995 = 00:01:40.995 = 146%
+Process Time =   101.556 = 00:01:41.556 = 146%
+Global Time  =    69.151 = 00:01:09.151 = 100%
 }}}
