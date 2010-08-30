@@ -37,4 +37,22 @@ Note: Levels 0-3 work fine but haven't been tweaked yet to strike the best balan
 
 See lzhamtest_x86/x64.exe's usage text for more command line parameters.
 
+Compiling LZHAM
+
+Out of the box, LZHAM can be compiled with Visual Studio 2008 (preferred) or with Codeblocks 10.05 using TDM-GCC x64 (GCC 4.5.0). 
+http://www.codeblocks.org/
+http://tdm-gcc.tdragon.net/
+
+Visual Studio 2008 solution is "lzham.sln". The codec seems to compile and run fine with Visual Studio 2010 in my limited testing.
+
+The codec compiles for Xbox 360 as well: lzham_x360.sln. Note that I barely spent any time verifying the codec on this platform.
+
+The Codeblocks workspace is "lzhamtest.workspace". The codec runs a bit slower when compiled with GCC, but the difference is less than 5%.
+
+Porting LZHAM
+
+The decompressor LIB relies on the Win32 fiber API to easily support streaming. This will probably be the biggest stumbling block to porting the decompressor 
+to a non-Win32 platform.
+
+The compressor LIB relies on the Win32 semaphore and threading API's. Long term, I plan on adding support for pthreads.
 
