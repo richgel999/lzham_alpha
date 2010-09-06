@@ -87,8 +87,6 @@
 		<Unit filename="lzham_semaphore.h" />
 		<Unit filename="lzham_task_pool.cpp" />
 		<Unit filename="lzham_task_pool.h" />
-		<Unit filename="lzham_waitable_lock.cpp" />
-		<Unit filename="lzham_waitable_lock.h" />
 		<Extensions>
 			<code_completion />
 			<debugger />
