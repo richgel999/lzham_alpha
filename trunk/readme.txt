@@ -1,4 +1,4 @@
-LZHAM Codec - Alpha3 - Released Aug. 30 2010
+LZHAM Codec - Alpha4 - Released Sept. 5, 2010
 Copyright (c) 2009-2010 Richard Geldreich, Jr. <richgel99@gmail.com>
 MIT License - http://code.google.com/p/lzham/
 
@@ -32,8 +32,9 @@ The x86 version defaults to 64MB (26), and the x64 version defaults to 256MB (28
 	
 - Set compression level to uber (the default):
 	lzhamtest_x64 -m4 c source_filename compressed_filename
-		
-Note: Levels 0-3 work fine but haven't been tweaked yet to strike the best balance of speed vs. compression ratio. Level 4 (uber) is currently the preferred mode.
+	
+- For best compression, use the -x option with -m4, which enables more rigorous (but ~4X slower!) parsing:
+	lzhamtest_x64 -x -m4 c source_filename compressed_filename
 
 See lzhamtest_x86/x64.exe's usage text for more command line parameters.
 
