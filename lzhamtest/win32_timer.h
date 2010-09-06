@@ -35,6 +35,7 @@ public:
    void stop();
       
    double get_elapsed_secs() const;
+   inline double get_elapsed_ms() const { return get_elapsed_secs() * 1000.0f; }
    unsigned long long get_elapsed_us() const;
    
    static void init();

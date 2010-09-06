@@ -332,6 +332,10 @@
 				>
 			</File>
 			<File
+				RelativePath=".\lzham_timer.cpp"
+				>
+			</File>
+			<File
 				RelativePath=".\lzham_vector.cpp"
 				>
 			</File>
@@ -395,6 +399,10 @@
 			</File>
 			<File
 				RelativePath=".\lzham_symbol_codec.h"
+				>
+			</File>
+			<File
+				RelativePath=".\lzham_timer.h"
 				>
 			</File>
 			<File

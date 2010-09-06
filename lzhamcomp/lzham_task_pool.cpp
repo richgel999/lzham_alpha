@@ -21,12 +21,14 @@
 // THE SOFTWARE.
 #include "lzham_core.h"
 #include "lzham_task_pool.h"
+#include "lzham_timer.h"
 #include <process.h>
 
 namespace lzham
 {
    task_pool::task_pool() :
       m_num_threads(0),
+      m_tasks_available(0, 32767),
       m_num_outstanding_tasks(0),
       m_exit_flag(false)
    {
@@ -35,10 +37,12 @@ namespace lzham
 
    task_pool::task_pool(uint num_threads) :
       m_num_threads(0),
+      m_tasks_available(0, 32767),
       m_num_outstanding_tasks(0),
       m_exit_flag(false)
    {
       utils::zero_object(m_threads);
+
       bool status = init(num_threads);
       LZHAM_VERIFY(status);
    }
@@ -55,24 +59,22 @@ namespace lzham
 
       deinit();
 
-      m_task_waitable_lock.lock();
-
-      m_num_threads = num_threads;
-
       bool succeeded = true;
-      for (uint i = 0; i < num_threads; i++)
-      {
-         m_threads[i] = (HANDLE)_beginthreadex(NULL, 32768, thread_func, this, 0, NULL);
 
-         LZHAM_ASSERT(m_threads[i] != 0);
-         if (!m_threads[i])
+      m_num_threads = 0;
+      while (m_num_threads < num_threads)
+      {
+         m_threads[m_num_threads] = (HANDLE)_beginthreadex(NULL, 32768, thread_func, this, 0, NULL);
+         LZHAM_ASSERT(m_threads[m_num_threads] != 0);
+
+         if (!m_threads[m_num_threads])
          {
             succeeded = false;
             break;
          }
-      }
 
-      m_task_waitable_lock.unlock();
+         m_num_threads++;
+      }
 
       if (!succeeded)
       {
@@ -87,11 +89,11 @@ namespace lzham
    {
       if (m_num_threads)
       {
-         m_task_waitable_lock.lock();
+         join();
 
-         m_exit_flag = true;
+         InterlockedExchange(&m_exit_flag, true);
 
-         m_task_waitable_lock.unlock();
+         m_tasks_available.release(m_num_threads);
 
          for (uint i = 0; i < m_num_threads; i++)
          {
@@ -99,75 +101,66 @@ namespace lzham
             {
                for ( ; ; )
                {
-                  DWORD result = WaitForSingleObject(m_threads[i], 10000);
-                  if (result == WAIT_OBJECT_0)
+                  DWORD result = WaitForSingleObject(m_threads[i], 30000);
+                  if ((result == WAIT_OBJECT_0) || (result == WAIT_ABANDONED))
                      break;
                }
 
                CloseHandle(m_threads[i]);
-
                m_threads[i] = NULL;
             }
          }
 
          m_num_threads = 0;
 
-         m_exit_flag = false;
+         InterlockedExchange(&m_exit_flag, false);
       }
 
-      m_tasks.clear();
+      m_task_stack.clear();
       m_num_outstanding_tasks = 0;
    }
 
-   uint task_pool::get_num_threads() const
+   bool task_pool::queue_task(task_callback_func pFunc, uint64 data, void* pData_ptr)
    {
-      return m_num_threads;
-   }
-
-   void task_pool::queue_task(task_callback_func pFunc, uint64 data, void* pData_ptr)
-   {
+      LZHAM_ASSERT(m_num_threads);
       LZHAM_ASSERT(pFunc);
-
-      m_task_waitable_lock.lock();
 
       task tsk;
       tsk.m_callback = pFunc;
       tsk.m_data = data;
       tsk.m_pData_ptr = pData_ptr;
       tsk.m_flags = 0;
-      m_tasks.push_back(tsk);
 
-      m_num_outstanding_tasks++;
+      if (!m_task_stack.try_push(tsk))
+         return false;
 
-      m_task_waitable_lock.unlock();
+      InterlockedIncrement(&m_num_outstanding_tasks);
+
+      m_tasks_available.release(1);
+
+      return true;
    }
 
    // It's the object's responsibility to delete pObj within the execute_task() method, if needed!
-   void task_pool::queue_task(executable_task* pObj, uint64 data, void* pData_ptr)
+   bool task_pool::queue_task(executable_task* pObj, uint64 data, void* pData_ptr)
    {
+      LZHAM_ASSERT(m_num_threads);
       LZHAM_ASSERT(pObj);
-
-      m_task_waitable_lock.lock();
 
       task tsk;
       tsk.m_pObj = pObj;
       tsk.m_data = data;
       tsk.m_pData_ptr = pData_ptr;
       tsk.m_flags = cTaskFlagObject;
-      m_tasks.push_back(tsk);
 
-      m_num_outstanding_tasks++;
+      if (!m_task_stack.try_push(tsk))
+         return false;
 
-      m_task_waitable_lock.unlock();
-   }
+      InterlockedIncrement(&m_num_outstanding_tasks);
 
-   BOOL task_pool::join_condition_func(void* pCallback_data_ptr, uint64 callback_data)
-   {
-      callback_data;
+      m_tasks_available.release(1);
 
-      task_pool* pPool = static_cast<task_pool*>(pCallback_data_ptr);
-
-      return (!pPool->m_num_outstanding_tasks) || pPool->m_exit_flag;
+      return true;
    }
 
    void task_pool::process_task(task& tsk)
@@ -177,49 +170,23 @@ namespace lzham
       else
          tsk.m_callback(tsk.m_data, tsk.m_pData_ptr);
 
-      m_task_waitable_lock.lock();
-
-      m_num_outstanding_tasks--;
-
-      m_task_waitable_lock.unlock();
+      InterlockedDecrement(&m_num_outstanding_tasks);
    }
 
    void task_pool::join()
    {
-      for ( ; ; )
+      while (lzham_interlocked_add(&m_num_outstanding_tasks, 0) > 0)
       {
-         m_task_waitable_lock.lock();
-
-         if (!m_tasks.empty())
+         task tsk;
+         if (m_task_stack.pop(tsk))
          {
-            task tsk(m_tasks.front());
-            m_tasks.pop_front();
-
-            m_task_waitable_lock.unlock();
-
             process_task(tsk);
          }
          else
          {
-            int result = m_task_waitable_lock.wait(join_condition_func, this);
-            result;
-            LZHAM_ASSERT(result >= 0);
-
-            m_task_waitable_lock.unlock();
-
-            break;
+            Sleep(1);
          }
       }
-   }
-
-   BOOL task_pool::wait_condition_func(void* pCallback_data_ptr, uint64 callback_data)
-   {
-      callback_data;
-
-      task_pool* pPool = static_cast<task_pool*>(pCallback_data_ptr);
-
-      // Wait condition is satisfied if there are tasks or if the task pool is being destroyed.
-      return (!pPool->m_tasks.empty()) || pPool->m_exit_flag;
    }
 
    unsigned __stdcall task_pool::thread_func(void* pContext)
@@ -228,27 +195,15 @@ namespace lzham
 
       for ( ; ; )
       {
-         pPool->m_task_waitable_lock.lock();
-
-         int result = pPool->m_task_waitable_lock.wait(wait_condition_func, pPool);
-
-         LZHAM_ASSERT(result >= 0);
-
-         if ((result < 0) || (pPool->m_exit_flag))
-         {
-            pPool->m_task_waitable_lock.unlock();
+         if (!pPool->m_tasks_available.wait())
             break;
-         }
 
-         if (pPool->m_tasks.empty())
-            pPool->m_task_waitable_lock.unlock();
-         else
+         if (pPool->m_exit_flag)
+            break;
+
+         task tsk;
+         if (pPool->m_task_stack.pop(tsk))
          {
-            task tsk(pPool->m_tasks.front());
-            pPool->m_tasks.pop_front();
-
-            pPool->m_task_waitable_lock.unlock();
-
             pPool->process_task(tsk);
          }
       }

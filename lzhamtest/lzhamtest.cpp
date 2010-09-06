@@ -66,6 +66,8 @@ typedef unsigned __int64 uint64;
 
 #define LZHAMTEST_IO_BUFFER_SIZE 65536*4
 
+#define LZHAMTEST_NO_RANDOM_EXTREME_PARSING 1
+
 struct comp_options
 {
    comp_options() :
@@ -75,7 +77,9 @@ struct comp_options
       m_max_helper_threads(0),
       m_unbuffered_decompression(false),
       m_verify_compressed_data(false),
-      m_randomize_params(false)
+      m_force_polar_codes(false),
+      m_randomize_params(false),
+      m_extreme_parsing(false)
    {
    }
 
@@ -87,6 +91,8 @@ struct comp_options
       printf("Max helper threads: %i\n", m_max_helper_threads);
       printf("Unbuffered decompression: %u\n", (uint)m_unbuffered_decompression);
       printf("Verify compressed data: %u\n", (uint)m_verify_compressed_data);
+      printf("Force Polar codes: %u\n", (uint)m_force_polar_codes);
+      printf("Extreme parsing: %u\n", (uint)m_extreme_parsing);
       printf("Randomize parameters: %u\n", m_randomize_params);
    }
 
@@ -96,12 +102,14 @@ struct comp_options
    int m_max_helper_threads;
    bool m_unbuffered_decompression;
    bool m_verify_compressed_data;
+   bool m_force_polar_codes;
    bool m_randomize_params;
+   bool m_extreme_parsing;
 };
 
 static void print_usage()
 {
-   printf("Usage: [options] [c/d/a] inpath/infile [outfile]\n");
+   printf("Usage: [options] [mode] inpath/infile [outfile]\n");
    printf("\n");
    printf("Modes:\n");
    printf("c - Compress \"infile\" to \"outfile\"\n");
@@ -111,12 +119,17 @@ static void print_usage()
    printf("Options:\n");
    printf("-m[0-4] - Compression level: 0=fastest, 1=faster, 2=default, 3=better, 4=uber\n");
    printf("          Default is uber (4).\n");
-   printf("-d[15-29] - Set log2 dictionary size, max. is 26 on x86 platforms.\n");
+   printf("-d[15-29] - Set log2 dictionary size, max. is 26 on x86 platforms, 29 on x64.\n");
    printf("          Default is 26 (64MB) on x86, 28 (256MB) on x64.\n");
    printf("-c - Do not compute or verify adler32 checksum during decompression (faster).\n");
    printf("-u - Use unbuffered decompression on files that can fit into memory.\n");
+   printf("     Unbuffered decompression is faster, but has much more I/O overhead.\n");
    printf("-t[0-16] - Number of compression helper threads. Default=# CPU's-1.\n");
+   printf("           Note: The total number of threads will be 1 + num_helper_threads,\n");
+   printf("           because the main thread is counted separately.\n");
    printf("-v - Immediately decompress compressed file after compression for verification.\n");
+   printf("-p - Use Polar codes in all higher compression levels (faster decompression).\n");
+   printf("-x - Extreme parsing, for slight compression gain (Uber only, MUCH slower).\n");
 }
 
 static void print_error(const char *pMsg, ...)
@@ -143,7 +156,7 @@ static int simple_test(lzham_dll_loader &lzham_dll, const comp_options &options)
    comp_params.m_struct_size = sizeof(comp_params);
    comp_params.m_dict_size_log2 = options.m_dict_size_log2;
    comp_params.m_level = options.m_comp_level;
-   comp_params.m_max_helper_threads = 0;
+   comp_params.m_max_helper_threads = 1;
 
    lzham_uint8 cmp_buf[1024];
    size_t cmp_len = sizeof(cmp_buf);
@@ -251,6 +264,14 @@ static bool compress_streaming(lzham_dll_loader &lzham_dll, const char* pSrc_fil
    params.m_dict_size_log2 = options.m_dict_size_log2;
    params.m_max_helper_threads = options.m_max_helper_threads;
    params.m_level = options.m_comp_level;
+   if (options.m_force_polar_codes)
+   {
+      params.m_compress_flags |= LZHAM_COMP_FLAG_FORCE_POLAR_CODING;
+   }
+   if (options.m_extreme_parsing)
+   {
+      params.m_compress_flags |= LZHAM_COMP_FLAG_EXTREME_PARSING;
+   }
    params.m_cpucache_line_size = 0;
    params.m_cpucache_total_lines = 0;
 
@@ -273,6 +294,7 @@ static bool compress_streaming(lzham_dll_loader &lzham_dll, const char* pSrc_fil
    lzham_compress_status_t status;
    for ( ; ; )
    {
+#if 1   
       if (src_file_size)
       {
          double total_elapsed_time = win32_timer::ticks_to_secs(win32_timer::get_ticks() - start_time);
@@ -284,6 +306,7 @@ static bool compress_streaming(lzham_dll_loader &lzham_dll, const char* pSrc_fil
          printf("Progress: %3.1f%%, Bytes Remaining: %3.1fMB, %3.3fMB/sec", (1.0f - (static_cast<float>(src_bytes_left) / src_file_size)) * 100.0f, src_bytes_left / 1048576.0f, comp_rate / (1024.0f * 1024.0f));
          printf("                \b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b");
       }
+#endif      
 
       if (in_file_buf_ofs == in_file_buf_size)
       {
@@ -827,6 +850,10 @@ static bool test_recursive(lzham_dll_loader &lzham_dll, const char *pPath, comp_
          file_options.m_dict_size_log2 = LZHAM_MIN_DICT_SIZE_LOG2 + (rand() % (LZHAMTEST_MAX_POSSIBLE_DICT_SIZE - LZHAM_MIN_DICT_SIZE_LOG2 + 1));
          file_options.m_max_helper_threads = rand() % (LZHAM_MAX_HELPER_THREADS + 1);
          file_options.m_unbuffered_decompression = (rand() & 1) != 0;
+#if !LZHAMTEST_NO_RANDOM_EXTREME_PARSING         
+         file_options.m_extreme_parsing = (rand() & 1) != 0;
+#endif         
+         file_options.m_force_polar_codes = (rand() & 1) != 0;
          
          file_options.print();
       }
@@ -997,6 +1024,16 @@ int main_internal(string_array cmd_line, int num_helper_threads, lzham_dll_loade
             case 'r':
             {
                options.m_randomize_params = true;
+               break;
+            }
+            case 'p':
+            {
+               options.m_force_polar_codes = true;
+               break;
+            }
+            case 'x':
+            {
+               options.m_extreme_parsing = true;
                break;
             }
             default:

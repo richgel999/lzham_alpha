@@ -20,6 +20,7 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 // THE SOFTWARE.
 #include "lzham_core.h"
+#include "lzham_timer.h"
 
 #ifdef LZHAM_PLATFORM_X360
 #include <xbdm.h>
@@ -65,4 +66,96 @@ int sprintf_s(char *buffer, size_t sizeOfBuffer, const char *format, ...)
 
    return LZHAM_MIN(c, (int)sizeOfBuffer - 1);
 }
+int vsprintf_s(char *buffer, size_t sizeOfBuffer, const char *format, va_list args)
+{
+   if (!sizeOfBuffer)
+      return 0;
+   
+   int c = vsnprintf(buffer, sizeOfBuffer, format, args);
+
+   buffer[sizeOfBuffer - 1] = '\0';
+
+   if (c < 0)
+      return sizeOfBuffer - 1;
+
+   return LZHAM_MIN(c, (int)sizeOfBuffer - 1);
+}
 #endif
+
+#if LZHAM_BUFFERED_PRINTF
+
+namespace lzham
+{
+   struct buffered_str
+   {
+      enum { cBufSize = 256 };
+      char m_buf[cBufSize];
+   };
+
+   static lzham::vector<buffered_str> g_buffered_strings;
+   static volatile long g_buffered_string_locked;
+   
+   static void lock_buffered_strings()
+   {
+      while (InterlockedExchange(&g_buffered_string_locked, 1) == 1)
+      {
+         lzham_yield_processor();
+         lzham_yield_processor();
+         lzham_yield_processor();
+         lzham_yield_processor();
+      }
+
+      LZHAM_MEMORY_IMPORT_BARRIER
+   }
+   
+   static void unlock_buffered_strings()
+   {
+      LZHAM_MEMORY_EXPORT_BARRIER
+
+      InterlockedExchange(&g_buffered_string_locked, 0);
+   }
+
+} // namespace lzham
+
+void lzham_buffered_printf(const char *format, ...)
+{
+   format;
+   
+   char buf[lzham::buffered_str::cBufSize];
+   
+   va_list args;
+   va_start(args, format);
+   vsnprintf_s(buf, sizeof(buf), sizeof(buf), format, args);
+   va_end(args);   
+
+   buf[sizeof(buf) - 1] = '\0';
+   
+   lzham::lock_buffered_strings();
+   
+   if (!lzham::g_buffered_strings.capacity())
+   {
+      lzham::g_buffered_strings.try_reserve(2048);
+   }
+
+   if (lzham::g_buffered_strings.try_resize(lzham::g_buffered_strings.size() + 1))
+   {
+      memcpy(lzham::g_buffered_strings.back().m_buf, buf, sizeof(buf));
+   }
+
+   lzham::unlock_buffered_strings();
+}
+
+void lzham_flush_buffered_printf()
+{
+   lzham::lock_buffered_strings();
+
+   for (lzham::uint i = 0; i < lzham::g_buffered_strings.size(); i++)
+   {
+      printf("%s", lzham::g_buffered_strings[i].m_buf);
+   }
+
+   lzham::g_buffered_strings.try_resize(0);
+
+   lzham::unlock_buffered_strings();
+}
+#endif   

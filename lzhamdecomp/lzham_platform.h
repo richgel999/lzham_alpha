@@ -97,6 +97,7 @@ inline void lzham_yield_processor()
 
 #ifdef __GNUC__
 int sprintf_s(char *buffer, size_t sizeOfBuffer, const char *format, ...);
+int vsprintf_s(char *buffer, size_t sizeOfBuffer, const char *format, va_list args);
 #endif
 
 #if ( defined(_MSC_VER) && !defined(LZHAM_PLATFORM_X360) ) || defined(__MINGW32__) || defined(__MINGW64__)
@@ -117,4 +118,16 @@ int sprintf_s(char *buffer, size_t sizeOfBuffer, const char *format, ...);
 #else   
    // Barriers shouldn't be necessary on x86/x64.
    #define LZHAM_MEMORY_IMPORT_BARRIER
+#endif
+
+#if LZHAM_BUFFERED_PRINTF
+
+void lzham_buffered_printf(const char *format, ...);
+void lzham_flush_buffered_printf();
+
+#else
+
+inline void lzham_buffered_printf(const char *format, ...) { (void)format; }
+inline void lzham_flush_buffered_printf() { }
+
 #endif

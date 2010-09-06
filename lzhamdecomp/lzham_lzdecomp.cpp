@@ -181,6 +181,9 @@ namespace lzham
 
       bool huffman_decoders_initialized = false;
 
+#ifdef LZDEBUG
+	  uint block_index = 0;
+#endif
       do
       {
          codec.start_arith_decoding();
@@ -626,6 +629,9 @@ namespace lzham
                break;
             }
          }
+#ifdef LZDEBUG
+		 block_index++;
+#endif
       } while (status == LZHAM_DECOMP_STATUS_NOT_FINISHED);
 
       if (dst_ofs)
