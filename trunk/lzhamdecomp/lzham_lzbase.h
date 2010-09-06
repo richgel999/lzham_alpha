@@ -34,7 +34,8 @@ namespace lzham
          cMinDictSizeLog2 = 15,
          cMaxDictSizeLog2 = 29,
                   
-         cMatchHistSize = 3
+         cMatchHistSize = 3,
+         cMaxLen2MatchDist = 2047
       };
 
       enum 

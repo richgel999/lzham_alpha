@@ -21,10 +21,19 @@
 // THE SOFTWARE.
 #include "lzham_core.h"
 #include "lzham_match_accel.h"
+#include "lzham_timer.h"
 
 namespace lzham
 {
-   const uint cMaxSupportedProbes = 128;
+   static inline uint32 hash2_to_12(uint c0, uint c1)
+   {
+      return c0 ^ (c1 << 4);
+   }
+
+   static inline uint32 hash3_to_16(uint c0, uint c1, uint c2)
+   {
+      return (c0 | (c1 << 8)) ^ (c2 << 4);
+   }
 
    search_accelerator::search_accelerator() :
       m_pLZBase(NULL),
@@ -35,13 +44,13 @@ namespace lzham
       m_lookahead_pos(0),
       m_lookahead_size(0),
       m_cur_dict_size(0),
-      m_next_match_ref(0),
       m_fill_lookahead_pos(0),
       m_fill_lookahead_size(0),
       m_fill_dict_size(0),
       m_max_probes(0),
       m_max_matches(0),
-      m_all_matches(false)
+      m_all_matches(false),
+      m_next_match_ref(0)
    {
    }
 
@@ -51,7 +60,7 @@ namespace lzham
       LZHAM_ASSERT(max_dict_size && math::is_power_of_2(max_dict_size));
       LZHAM_ASSERT(max_probes);
 
-      m_max_probes = LZHAM_MIN(cMaxSupportedProbes, max_probes);
+      m_max_probes = LZHAM_MIN(cMatchAccelMaxSupportedProbes, max_probes);
 
       m_pLZBase = pLZBase;
       m_pTask_pool = max_helper_threads ? pPool : NULL;
@@ -73,7 +82,7 @@ namespace lzham
 
       if (!m_hash.try_resize_no_construct(cHashSize))
          return false;
-            
+
       if (!m_nodes.try_resize_no_construct(max_dict_size))
          return false;
 
@@ -88,188 +97,226 @@ namespace lzham
       return m_max_dict_size - add_pos;
    }
 
-   inline bool search_accelerator::is_better_match(uint bestMatchDist, uint compMatchDist) const
+   static uint8 g_hamming_dist[256] =
    {
-      uint bestMatchSlot, bestMatchSlotOfs;
-      m_pLZBase->compute_lzx_position_slot(bestMatchDist, bestMatchSlot, bestMatchSlotOfs);
-
-      uint compMatchSlot, compMatchOfs;
-      m_pLZBase->compute_lzx_position_slot(compMatchDist, compMatchSlot, compMatchOfs);
-
-      // If both matches uses the same match slot, choose the one with the offset containing the lowest nibble as these bits separately entropy coded.
-      // This could choose a match which is further away in the absolute sense, but closer in a coding sense.
-      if ( (compMatchSlot < bestMatchSlot) ||
-         ((compMatchSlot >= 8) && (compMatchSlot == bestMatchSlot) && ((compMatchOfs & 15) < (bestMatchSlotOfs & 15))) )
-      {
-         return true;
-      }
-
-      return false;
-   }
+      0, 1, 1, 2, 1, 2, 2, 3, 1, 2, 2, 3, 2, 3, 3, 4,
+      1, 2, 2, 3, 2, 3, 3, 4, 2, 3, 3, 4, 3, 4, 4, 5,
+      1, 2, 2, 3, 2, 3, 3, 4, 2, 3, 3, 4, 3, 4, 4, 5,
+      2, 3, 3, 4, 3, 4, 4, 5, 3, 4, 4, 5, 4, 5, 5, 6,
+      1, 2, 2, 3, 2, 3, 3, 4, 2, 3, 3, 4, 3, 4, 4, 5,
+      2, 3, 3, 4, 3, 4, 4, 5, 3, 4, 4, 5, 4, 5, 5, 6,
+      2, 3, 3, 4, 3, 4, 4, 5, 3, 4, 4, 5, 4, 5, 5, 6,
+      3, 4, 4, 5, 4, 5, 5, 6, 4, 5, 5, 6, 5, 6, 6, 7,
+      1, 2, 2, 3, 2, 3, 3, 4, 2, 3, 3, 4, 3, 4, 4, 5,
+      2, 3, 3, 4, 3, 4, 4, 5, 3, 4, 4, 5, 4, 5, 5, 6,
+      2, 3, 3, 4, 3, 4, 4, 5, 3, 4, 4, 5, 4, 5, 5, 6,
+      3, 4, 4, 5, 4, 5, 5, 6, 4, 5, 5, 6, 5, 6, 6, 7,
+      2, 3, 3, 4, 3, 4, 4, 5, 3, 4, 4, 5, 4, 5, 5, 6,
+      3, 4, 4, 5, 4, 5, 5, 6, 4, 5, 5, 6, 5, 6, 6, 7,
+      3, 4, 4, 5, 4, 5, 5, 6, 4, 5, 5, 6, 5, 6, 6, 7,
+      4, 5, 5, 6, 5, 6, 6, 7, 5, 6, 6, 7, 6, 7, 7, 8
+   };
 
    void search_accelerator::find_all_matches_callback(uint64 data, void* pData_ptr)
    {
+      scoped_perf_section find_all_matches_timer("find_all_matches_callback");
+
       pData_ptr;
       const uint thread_index = (uint)data;
 
-      dict_match temp_matches[cMaxSupportedProbes * 2];
+      dict_match temp_matches[cMatchAccelMaxSupportedProbes * 2];
 
       uint fill_lookahead_pos = m_fill_lookahead_pos;
       uint fill_dict_size = m_fill_dict_size;
       uint fill_lookahead_size = m_fill_lookahead_size;
 
-      while (fill_lookahead_size)
+      uint c0 = 0, c1 = 0;
+      if (fill_lookahead_size >= 2)
       {
-         const uint max_match_len = LZHAM_MIN(CLZBase::cMaxMatchLen, fill_lookahead_size);
+         c0 = m_dict[fill_lookahead_pos & m_max_dict_size_mask];
+         c1 = m_dict[(fill_lookahead_pos & m_max_dict_size_mask) + 1];
+      }
+
+      const uint8* pDict = m_dict.get_ptr();
+
+      while (fill_lookahead_size >= 3)
+      {
          uint insert_pos = fill_lookahead_pos & m_max_dict_size_mask;
-         if (max_match_len >= 2)
+
+         uint c2 = pDict[insert_pos + 2];
+         uint h = hash3_to_16(c0, c1, c2);
+         c0 = c1;
+         c1 = c2;
+
+         LZHAM_ASSERT(!m_hash_thread_index.size() || (m_hash_thread_index[h] != UINT8_MAX));
+
+         // Only process those strings that this worker thread was assigned to - this allows us to manipulate multiple trees in parallel with no worries about synchronization.
+         if (m_hash_thread_index.size() && (m_hash_thread_index[h] != thread_index))
          {
-            uint c0 = m_dict[insert_pos];
-            uint c1 = m_dict[insert_pos + 1];
+            fill_lookahead_pos++;
+            fill_lookahead_size--;
+            fill_dict_size++;
+            continue;
+         }
 
-            uint h = (c1 << 8) | c0;
+         dict_match* pDstMatch = temp_matches;
 
-            if (m_pTask_pool)
+         uint cur_pos = m_hash[h];
+         m_hash[h] = static_cast<uint>(fill_lookahead_pos);
+
+         uint *pLeft = &m_nodes[insert_pos].m_left;
+         uint *pRight = &m_nodes[insert_pos].m_right;
+
+         const uint max_match_len = LZHAM_MIN(CLZBase::cMaxMatchLen, fill_lookahead_size);
+         uint best_match_len = 2;
+
+         const uint8* pIns = &pDict[insert_pos];
+
+         uint n = m_max_probes;
+         for ( ; ; )
+         {
+            uint delta_pos = fill_lookahead_pos - cur_pos;
+            if ((n-- == 0) || (!delta_pos) || (delta_pos >= fill_dict_size))
             {
-               LZHAM_ASSERT(m_hash_thread_index[h] != UINT8_MAX);
+               *pLeft = 0;
+               *pRight = 0;
+               break;
             }
 
-            // Only process those strings that this worker thread was assigned to - this allows us to manipulate multiple trees in parallel with no worries about synchronization.
-            if ((!m_pTask_pool) || (m_hash_thread_index[h] == thread_index))
-            {
-               dict_match* pDstMatch = temp_matches;
+            uint pos = cur_pos & m_max_dict_size_mask;
+            node *pNode = &m_nodes[pos];
 
-               uint cur_pos = m_hash[h];
-               m_hash[h] = static_cast<uint>(fill_lookahead_pos);
+            // Unfortunately, the initial compare match_len must be 2 because of the way we truncate matches at the end of each block.
+            uint match_len = 0;
+            const uint8* pComp = &pDict[pos];
 
-               uint *pLeft = &m_nodes[insert_pos].m_left;
-               uint *pRight = &m_nodes[insert_pos].m_right;
-
-               uint best_match_len = 1;
-
-               const uint8* pIns = &m_dict[insert_pos];
-
-               uint n = m_max_probes;
-               for ( ; ; )
-               {
-                  uint delta_pos = fill_lookahead_pos - cur_pos;
-                  if ((n-- == 0) || (!delta_pos) || (delta_pos >= fill_dict_size))
-                  {
-                     *pLeft = 0;
-                     *pRight = 0;
-                     break;
-                  }
-
-                  uint pos = cur_pos & m_max_dict_size_mask;
-                  node *pNode = &m_nodes[pos];
-
-                  // Unfortunately, the initial compare match_len must be 2 because of the way we truncate matches at the end of each block.
-                  uint match_len = 2;
-                  const uint8* pComp = &m_dict[pos];
-
-#if 0
-                  for ( ; match_len < max_match_len; match_len++)
-                     if (pComp[match_len] != pIns[match_len])
-                        break;
+#ifdef PLATFORM_X360
+            for ( ; match_len < max_match_len; match_len++)
+               if (pComp[match_len] != pIns[match_len])
+                  break;
 #else
-                  // Compare a qword at a time for a bit more efficiency.
-                  const uint64* pComp_end = reinterpret_cast<const uint64*>(pComp + max_match_len - 7);
-                  const uint64* pComp_cur = reinterpret_cast<const uint64*>(pComp + 2);
-                  const uint64* pIns_cur = reinterpret_cast<const uint64*>(pIns + 2);
-                  while (pComp_cur < pComp_end)
-                  {
-                     if (*pComp_cur != *pIns_cur) 
-                        break;
-                     pComp_cur++;
-                     pIns_cur++;                  
-                  }
-                  uint alt_match_len = static_cast<uint>(reinterpret_cast<const uint8*>(pComp_cur) - reinterpret_cast<const uint8*>(pComp));
-                  for ( ; alt_match_len < max_match_len; alt_match_len++)
-                     if (pComp[alt_match_len] != pIns[alt_match_len])
-                        break;
+            // Compare a qword at a time for a bit more efficiency.
+            const uint64* pComp_end = reinterpret_cast<const uint64*>(pComp + max_match_len - 7);
+            const uint64* pComp_cur = reinterpret_cast<const uint64*>(pComp);
+            const uint64* pIns_cur = reinterpret_cast<const uint64*>(pIns);
+            while (pComp_cur < pComp_end)
+            {
+               if (*pComp_cur != *pIns_cur)
+                  break;
+               pComp_cur++;
+               pIns_cur++;
+            }
+            uint alt_match_len = static_cast<uint>(reinterpret_cast<const uint8*>(pComp_cur) - reinterpret_cast<const uint8*>(pComp));
+            for ( ; alt_match_len < max_match_len; alt_match_len++)
+               if (pComp[alt_match_len] != pIns[alt_match_len])
+                  break;
 #ifdef LZVERIFY
-                  for ( ; match_len < max_match_len; match_len++)
-                     if (pComp[match_len] != pIns[match_len])
-                        break;
-                  LZHAM_VERIFY(alt_match_len == match_len);
+            for ( ; match_len < max_match_len; match_len++)
+               if (pComp[match_len] != pIns[match_len])
+                  break;
+            LZHAM_VERIFY(alt_match_len == match_len);
 #endif
-                  match_len = alt_match_len;                  
-#endif                        
+            match_len = alt_match_len;
+#endif
 
-                  if (match_len > best_match_len)
-                  {
-                     pDstMatch->m_len = static_cast<uint8>(match_len - 2);
-                     pDstMatch->m_dist = delta_pos;
-                     pDstMatch++;
+            if (match_len > best_match_len)
+            {
+               pDstMatch->m_len = static_cast<uint8>(match_len - CLZBase::cMinMatchLen);
+               pDstMatch->m_dist = delta_pos;
+               pDstMatch++;
 
-                     best_match_len = match_len;
+               best_match_len = match_len;
 
-                     if (match_len == max_match_len)
-                     {
-                        *pLeft = pNode->m_left;
-                        *pRight = pNode->m_right;
-                        break;
-                     }
-                  }
-                  else if (m_all_matches)
-                  {
-                     pDstMatch->m_len = static_cast<uint8>(match_len - 2);
-                     pDstMatch->m_dist = delta_pos;
-                     pDstMatch++;
-                  }
-                  else if ((best_match_len > 1) && (best_match_len == match_len))
-                  {
-                     if (is_better_match(pDstMatch[-1].m_dist, delta_pos))
-                     {
-                        LZHAM_ASSERT((pDstMatch[-1].m_len + 2U) == best_match_len);
-                        pDstMatch[-1].m_dist = delta_pos;
-                     }
-                  }
-
-                  if (pComp[match_len] < pIns[match_len])
-                  {
-                     *pLeft = cur_pos;
-                     pLeft = &pNode->m_right;
-                     cur_pos = pNode->m_right;
-                  }
-                  else
-                  {
-                     *pRight = cur_pos;
-                     pRight = &pNode->m_left;
-                     cur_pos = pNode->m_left;
-                  }
-               }
-
-               const uint num_matches = (uint)(pDstMatch - temp_matches);
-
-               if (num_matches)
+               if (match_len == max_match_len)
                {
-                  pDstMatch[-1].m_dist |= 0x80000000;
-
-                  const uint num_matches_to_write = LZHAM_MIN(num_matches, m_max_matches);
-
-                  const uint match_ref_ofs = InterlockedExchangeAdd(&m_next_match_ref, num_matches_to_write);
-
-                  memcpy(&m_matches[match_ref_ofs],
-                         temp_matches + (num_matches - num_matches_to_write),
-                         sizeof(temp_matches[0]) * num_matches_to_write);
-
-                  // FIXME: This is going to really hurt on platforms requiring export barriers.
-                  LZHAM_MEMORY_EXPORT_BARRIER
-                  
-                  InterlockedExchange((LONG*)&m_match_refs[static_cast<uint>(fill_lookahead_pos - m_fill_lookahead_pos)], match_ref_ofs);
-               }
-               else
-               {
-                  InterlockedExchange((LONG*)&m_match_refs[static_cast<uint>(fill_lookahead_pos - m_fill_lookahead_pos)], -2);
+                  *pLeft = pNode->m_left;
+                  *pRight = pNode->m_right;
+                  break;
                }
             }
+            else if (m_all_matches)
+            {
+               pDstMatch->m_len = static_cast<uint8>(match_len - CLZBase::cMinMatchLen);
+               pDstMatch->m_dist = delta_pos;
+               pDstMatch++;
+            }
+            else if ((best_match_len > 2) && (best_match_len == match_len))
+            {
+               uint bestMatchDist = pDstMatch[-1].m_dist;
+               uint compMatchDist = delta_pos;
+
+               uint bestMatchSlot, bestMatchSlotOfs;
+               m_pLZBase->compute_lzx_position_slot(bestMatchDist, bestMatchSlot, bestMatchSlotOfs);
+
+               uint compMatchSlot, compMatchOfs;
+               m_pLZBase->compute_lzx_position_slot(compMatchDist, compMatchSlot, compMatchOfs);
+
+               // If both matches uses the same match slot, choose the one with the offset containing the lowest nibble as these bits separately entropy coded.
+               // This could choose a match which is further away in the absolute sense, but closer in a coding sense.
+               if ( (compMatchSlot < bestMatchSlot) ||
+                  ((compMatchSlot >= 8) && (compMatchSlot == bestMatchSlot) && ((compMatchOfs & 15) < (bestMatchSlotOfs & 15))) )
+               {
+                  LZHAM_ASSERT((pDstMatch[-1].m_len + (uint)CLZBase::cMinMatchLen) == best_match_len);
+                  pDstMatch[-1].m_dist = delta_pos;
+               }
+               else if ((match_len < max_match_len) && (compMatchSlot <= bestMatchSlot))
+               {
+                  // Choose the match which has lowest hamming distance in the mismatch byte for a tiny win on binary files.
+                  // TODO: This competes against the prev. optimization.
+                  uint desired_mismatch_byte = pIns[match_len];
+
+                  uint cur_mismatch_byte = pDict[(insert_pos - bestMatchDist + match_len) & m_max_dict_size_mask];
+                  uint cur_mismatch_dist = g_hamming_dist[cur_mismatch_byte ^ desired_mismatch_byte];
+
+                  uint new_mismatch_byte = pComp[match_len];
+                  uint new_mismatch_dist = g_hamming_dist[new_mismatch_byte ^ desired_mismatch_byte];
+                  if (new_mismatch_dist < cur_mismatch_dist)
+                  {
+                     LZHAM_ASSERT((pDstMatch[-1].m_len + (uint)CLZBase::cMinMatchLen) == best_match_len);
+                     pDstMatch[-1].m_dist = delta_pos;
+                  }
+               }
+            }
+
+            uint new_pos;
+            if (pComp[match_len] < pIns[match_len])
+            {
+               *pLeft = cur_pos;
+               pLeft = &pNode->m_right;
+               new_pos = pNode->m_right;
+            }
+            else
+            {
+               *pRight = cur_pos;
+               pRight = &pNode->m_left;
+               new_pos = pNode->m_left;
+            }
+            if (new_pos == cur_pos)
+               break;
+            cur_pos = new_pos;
+         }
+
+         const uint num_matches = (uint)(pDstMatch - temp_matches);
+
+         if (num_matches)
+         {
+            pDstMatch[-1].m_dist |= 0x80000000;
+
+            const uint num_matches_to_write = LZHAM_MIN(num_matches, m_max_matches);
+
+            const uint match_ref_ofs = InterlockedExchangeAdd(&m_next_match_ref, num_matches_to_write);
+
+            memcpy(&m_matches[match_ref_ofs],
+                   temp_matches + (num_matches - num_matches_to_write),
+                   sizeof(temp_matches[0]) * num_matches_to_write);
+
+            // FIXME: This is going to really hurt on platforms requiring export barriers.
+            LZHAM_MEMORY_EXPORT_BARRIER
+
+            InterlockedExchange((LONG*)&m_match_refs[static_cast<uint>(fill_lookahead_pos - m_fill_lookahead_pos)], match_ref_ofs);
          }
          else
          {
-            m_nodes[insert_pos].m_left = 0;
-            m_nodes[insert_pos].m_right = 0;
-
             InterlockedExchange((LONG*)&m_match_refs[static_cast<uint>(fill_lookahead_pos - m_fill_lookahead_pos)], -2);
          }
 
@@ -277,6 +324,76 @@ namespace lzham
          fill_lookahead_size--;
          fill_dict_size++;
       }
+
+      while (fill_lookahead_size)
+      {
+         uint insert_pos = fill_lookahead_pos & m_max_dict_size_mask;
+         m_nodes[insert_pos].m_left = 0;
+         m_nodes[insert_pos].m_right = 0;
+
+         InterlockedExchange((LONG*)&m_match_refs[static_cast<uint>(fill_lookahead_pos - m_fill_lookahead_pos)], -2);
+
+         fill_lookahead_pos++;
+         fill_lookahead_size--;
+         fill_dict_size++;
+      }
+   }
+
+   bool search_accelerator::find_len2_matches()
+   {
+      enum { cDigramHashSize = 4096 };
+
+      if (!m_digram_hash.size())
+      {
+         if (!m_digram_hash.try_resize(cDigramHashSize))
+            return false;
+      }
+
+      if (m_digram_next.size() < m_lookahead_size)
+      {
+         if (!m_digram_next.try_resize(m_lookahead_size))
+            return false;
+      }
+
+      uint lookahead_dict_pos = m_lookahead_pos & m_max_dict_size_mask;
+
+      for (int lookahead_ofs = 0; lookahead_ofs < ((int)m_lookahead_size - 1); ++lookahead_ofs, ++lookahead_dict_pos)
+      {
+         uint c0 = m_dict[lookahead_dict_pos];
+         uint c1 = m_dict[lookahead_dict_pos + 1];
+
+         uint h = hash2_to_12(c0, c1) & (cDigramHashSize - 1);
+
+         m_digram_next[lookahead_ofs] = m_digram_hash[h];
+         m_digram_hash[h] = m_lookahead_pos + lookahead_ofs;
+      }
+
+      m_digram_next[m_lookahead_size - 1] = 0;
+
+      return true;
+   }
+
+   uint search_accelerator::get_len2_match(uint lookahead_ofs)
+   {
+      if ((m_fill_lookahead_size - lookahead_ofs) < 2)
+         return 0;
+
+      uint cur_pos = m_lookahead_pos + lookahead_ofs;
+
+      uint next_match_pos = m_digram_next[cur_pos - m_fill_lookahead_pos];
+
+      uint match_dist = cur_pos - next_match_pos;
+
+      if ((!match_dist) || (match_dist > CLZBase::cMaxLen2MatchDist) || (match_dist > (m_cur_dict_size + lookahead_ofs)))
+         return 0;
+
+      const uint8* pCur = &m_dict[cur_pos & m_max_dict_size_mask];
+      const uint8* pMatch = &m_dict[next_match_pos & m_max_dict_size_mask];
+
+      if ((pCur[0] == pMatch[0]) && (pCur[1] == pMatch[1]))
+         return match_dist;
+
+      return 0;
    }
 
    bool search_accelerator::find_all_matches(uint num_bytes)
@@ -286,7 +403,7 @@ namespace lzham
 
       if (!m_match_refs.try_resize_no_construct(num_bytes))
          return false;
-      
+
       memset(m_match_refs.get_ptr(), 0xFF, m_match_refs.size_in_bytes());
 
       m_fill_lookahead_pos = m_lookahead_pos;
@@ -303,37 +420,47 @@ namespace lzham
       {
          if (!m_hash_thread_index.try_resize_no_construct(0x10000))
             return false;
-         
+
          memset(m_hash_thread_index.get_ptr(), 0xFF, m_hash_thread_index.size_in_bytes());
 
          uint next_thread_index = 0;
          const uint8* pDict = &m_dict[m_lookahead_pos & m_max_dict_size_mask];
          uint num_unique_digrams = 0;
-         for (uint i = 0; i < (num_bytes - 1); i++)
+
+         if (num_bytes >= 3)
          {
-            const uint h = pDict[0] | (pDict[1] << 8);
-            pDict++;
+            uint c0 = pDict[0];
+            uint c1 = pDict[1];
 
-            if (m_hash_thread_index[h] == UINT8_MAX)
+            const int limit = ((int)num_bytes - 2);
+            for (int i = 0; i < limit; i++)
             {
-               num_unique_digrams++;
+               uint c2 = pDict[2];
+               uint t = hash3_to_16(c0, c1, c2);
+               c0 = c1;
+               c1 = c2;
 
-               m_hash_thread_index[h] = static_cast<uint8>(next_thread_index);
-               if (++next_thread_index == m_max_helper_threads)
-                  next_thread_index = 0;
+               pDict++;
+
+               if (m_hash_thread_index[t] == UINT8_MAX)
+               {
+                  num_unique_digrams++;
+
+                  m_hash_thread_index[t] = static_cast<uint8>(next_thread_index);
+                  if (++next_thread_index == m_max_helper_threads)
+                        next_thread_index = 0;
+               }
             }
          }
 
-         for (uint i = 0; i < m_max_helper_threads; i++)
-         {
-            m_pTask_pool->queue_object_task(this, &search_accelerator::find_all_matches_callback, i);
-         }
+         if (!m_pTask_pool->queue_multiple_object_tasks(this, &search_accelerator::find_all_matches_callback, 0, m_max_helper_threads))
+            return false;
       }
 
-      return true;
+      return find_len2_matches();
    }
 
-   void search_accelerator::add_bytes_begin(uint num_bytes, const uint8* pBytes)
+   bool search_accelerator::add_bytes_begin(uint num_bytes, const uint8* pBytes)
    {
       LZHAM_ASSERT(num_bytes <= m_max_dict_size);
       LZHAM_ASSERT(!m_lookahead_size);
@@ -346,14 +473,14 @@ namespace lzham
       if (add_pos < CLZBase::cMaxMatchLen)
          memcpy(&m_dict[m_max_dict_size], &m_dict[0], CLZBase::cMaxMatchLen);
 
-      m_lookahead_size += num_bytes;
+      m_lookahead_size = num_bytes;
 
       uint max_possible_dict_size = m_max_dict_size - num_bytes;
       m_cur_dict_size = LZHAM_MIN(m_cur_dict_size, max_possible_dict_size);
 
       m_next_match_ref = 0;
 
-      find_all_matches(num_bytes);
+      return find_all_matches(num_bytes);
    }
 
    void search_accelerator::add_bytes_end()
@@ -374,6 +501,7 @@ namespace lzham
 
       int match_ref;
       uint spin_count = 0;
+
       for ( ; ; )
       {
          match_ref = m_match_refs[match_ref_ofs];
@@ -394,17 +522,17 @@ namespace lzham
             lzham_yield_processor();
             lzham_yield_processor();
             lzham_yield_processor();
-            
+
             LZHAM_MEMORY_IMPORT_BARRIER
          }
          else
          {
             spin_count = cMaxSpinCount;
-            
+
             Sleep(1);
          }
       }
-      
+
       LZHAM_MEMORY_IMPORT_BARRIER
 
       return &m_matches[match_ref];
@@ -419,26 +547,5 @@ namespace lzham
 
       m_cur_dict_size += num_bytes;
       LZHAM_ASSERT(m_cur_dict_size <= m_max_dict_size);
-   }
-
-   uint search_accelerator::match(uint lookahead_ofs, int dist) const
-   {
-      LZHAM_ASSERT(lookahead_ofs < m_lookahead_size);
-
-      const int find_dict_size = m_cur_dict_size + lookahead_ofs;
-      if (dist > find_dict_size)
-         return 0;
-
-      const uint comp_pos = static_cast<uint>((m_lookahead_pos + lookahead_ofs - dist) & m_max_dict_size_mask);
-      const uint lookahead_pos = static_cast<uint>((m_lookahead_pos + lookahead_ofs) & m_max_dict_size_mask);
-
-      const uint max_match_len = LZHAM_MIN(CLZBase::cMaxMatchLen, m_lookahead_size - lookahead_ofs);
-
-      uint match_len;
-      for (match_len = 0; match_len < max_match_len; match_len++)
-         if (m_dict[comp_pos + match_len] != m_dict[lookahead_pos + match_len])
-            break;
-
-      return match_len;
    }
 }

@@ -25,6 +25,8 @@
 
 namespace lzham
 {
+   const uint cMatchAccelMaxSupportedProbes = 128;
+      
    struct node
    {
       uint m_left;
@@ -70,16 +72,37 @@ namespace lzham
       inline uint operator[](uint pos) const { return m_dict[pos]; }
             
       uint get_max_add_bytes() const;
-      void add_bytes_begin(uint num_bytes, const uint8* pBytes);
+      bool add_bytes_begin(uint num_bytes, const uint8* pBytes);
       void add_bytes_end();
-
-      dict_match* find_matches(uint lookahead_ofs, bool spin = true);
       
+      uint get_len2_match(uint lookahead_ofs);
+      dict_match* find_matches(uint lookahead_ofs, bool spin = true);
+            
       void advance_bytes(uint num_bytes);
       
-      uint match(uint lookahead_ofs, int dist) const;
+      LZHAM_FORCE_INLINE uint get_match_len(uint lookahead_ofs, int dist, uint max_match_len) const
+      {
+         LZHAM_ASSERT(lookahead_ofs < m_lookahead_size);
+
+         const int find_dict_size = m_cur_dict_size + lookahead_ofs;
+         if (dist > find_dict_size)
+            return 0;
+
+         const uint comp_pos = static_cast<uint>((m_lookahead_pos + lookahead_ofs - dist) & m_max_dict_size_mask);
+         const uint lookahead_pos = m_lookahead_pos + lookahead_ofs;
+         
+         const uint8* pComp = &m_dict[comp_pos];
+         const uint8* pLookahead = &m_dict[lookahead_pos];
+         
+         uint match_len;
+         for (match_len = 0; match_len < max_match_len; match_len++)
+            if (pComp[match_len] != pLookahead[match_len])
+               break;
+
+         return match_len;
+      }
             
-   private:
+   public:
       CLZBase* m_pLZBase;
       task_pool* m_pTask_pool;
       uint m_max_helper_threads;
@@ -96,17 +119,16 @@ namespace lzham
       
       enum { cHashSize = 65536 };
       lzham::vector<uint> m_hash;
-
       lzham::vector<node> m_nodes;
 
       lzham::vector<dict_match> m_matches;
-            
       lzham::vector<LONG> m_match_refs;
       
       lzham::vector<uint8> m_hash_thread_index;
-                  
-      volatile LONG m_next_match_ref;
-                  
+      
+      lzham::vector<uint> m_digram_hash;
+      lzham::vector<uint> m_digram_next;
+                                          
       uint m_fill_lookahead_pos;
       uint m_fill_lookahead_size;
       uint m_fill_dict_size;
@@ -115,10 +137,12 @@ namespace lzham
       uint m_max_matches;
       
       bool m_all_matches;
-                 
-      inline bool is_better_match(uint bestMatchDist, uint compMatchDist) const;
+                  
+      volatile LONG m_next_match_ref;
+                  
       void find_all_matches_callback(uint64 data, void* pData_ptr);
       bool find_all_matches(uint num_bytes);
+      bool find_len2_matches();
    };
 
 } // namespace lzham

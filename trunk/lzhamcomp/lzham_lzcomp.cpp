@@ -29,8 +29,9 @@ namespace lzham
 {
    struct lzham_compress_state
    {
-      lzcompressor m_compressor;
+      // task_pool requires 8 or 16 alignment
       task_pool m_tp;
+      lzcompressor m_compressor;
             
       uint m_dict_size_log2;
 
@@ -65,6 +66,7 @@ namespace lzham
       params.m_max_helper_threads = LZHAM_MIN(LZHAM_MAX_HELPER_THREADS, pParams->m_max_helper_threads);
       params.m_num_cachelines = pParams->m_cpucache_total_lines;
       params.m_cacheline_size = pParams->m_cpucache_line_size;
+      params.m_lzham_compress_flags = pParams->m_compress_flags;
       
       switch (pParams->m_level)
       {
@@ -265,23 +267,26 @@ namespace lzham
       if (status != LZHAM_COMP_STATUS_SUCCESS)
          return status;
 
-      task_pool tp;
+      task_pool *pTP = NULL;
       if (params.m_max_helper_threads)
       {
-         if (!tp.init(params.m_max_helper_threads))   
+         pTP = lzham_new<task_pool>();
+         if (!pTP->init(params.m_max_helper_threads))   
             return LZHAM_COMP_STATUS_FAILED;
 
-         params.m_pTask_pool = &tp;
+         params.m_pTask_pool = pTP;
       }
 
       lzcompressor *pCompressor = lzham_new<lzcompressor>();
       if (!pCompressor)
       {
+         lzham_delete(pTP);
          return LZHAM_COMP_STATUS_FAILED;
       }
       
       if (!pCompressor->init(params))
       {
+         lzham_delete(pTP);
          lzham_delete(pCompressor);
          return LZHAM_COMP_STATUS_INVALID_PARAMETER;
       }
@@ -291,6 +296,7 @@ namespace lzham
          if (!pCompressor->put_bytes(pSrc_buf, static_cast<uint32>(src_len)))
          {
             *pDst_len = 0;
+            lzham_delete(pTP);
             lzham_delete(pCompressor);
             return LZHAM_COMP_STATUS_FAILED;
          }
@@ -299,6 +305,7 @@ namespace lzham
       if (!pCompressor->put_bytes(NULL, 0))
       {
          *pDst_len = 0;
+         lzham_delete(pTP);
          lzham_delete(pCompressor);
          return LZHAM_COMP_STATUS_FAILED;
       }
@@ -313,12 +320,14 @@ namespace lzham
 
       if (comp_data.size() > dst_buf_size)
       {
+         lzham_delete(pTP);
          lzham_delete(pCompressor);
          return LZHAM_COMP_STATUS_OUTPUT_BUF_TOO_SMALL;
       }
 
       memcpy(pDst_buf, comp_data.get_ptr(), comp_data.size());
 
+      lzham_delete(pTP);
       lzham_delete(pCompressor);
       return LZHAM_COMP_STATUS_SUCCESS;  
    }

@@ -23,7 +23,7 @@
 
 // Upper byte = major version
 // Lower byte = minor version
-#define LZHAM_DLL_VERSION        0x1003
+#define LZHAM_DLL_VERSION        0x1004
 
 #ifdef _XBOX
    #define LZHAM_DLL_FILENAME       "lzham_x360.dll"
@@ -109,6 +109,11 @@ extern "C" {
 
    // streaming (zlib-like) interface
    typedef void *lzham_compress_state_ptr;
+   enum lzham_compress_flags
+   {
+      LZHAM_COMP_FLAG_FORCE_POLAR_CODING = 1,
+      LZHAM_COMP_FLAG_EXTREME_PARSING = 2
+   };
 
    struct lzham_compress_params
    {
@@ -118,6 +123,7 @@ extern "C" {
       lzham_uint32 m_max_helper_threads;
       lzham_uint32 m_cpucache_total_lines;
       lzham_uint32 m_cpucache_line_size;
+      lzham_uint32 m_compress_flags;
    };
    LZHAM_DLL_EXPORT lzham_compress_state_ptr lzham_compress_init(const lzham_compress_params *pParams);
 

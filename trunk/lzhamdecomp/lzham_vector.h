@@ -305,9 +305,9 @@ namespace lzham
       }
 
       // push_front() isn't going to be very fast - it's only here for usability.
-      inline void push_front(const T& obj)
+      inline bool try_push_front(const T& obj)
       {
-         insert(0, &obj, 1);
+         return insert(0, &obj, 1);
       }
 
       bool append(const vector& other)

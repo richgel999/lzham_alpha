@@ -307,10 +307,6 @@
 				RelativePath=".\lzham_task_pool.cpp"
 				>
 			</File>
-			<File
-				RelativePath=".\lzham_waitable_lock.cpp"
-				>
-			</File>
 		</Filter>
 		<Filter
 			Name="Header Files"
@@ -339,10 +335,6 @@
 			</File>
 			<File
 				RelativePath=".\lzham_task_pool.h"
-				>
-			</File>
-			<File
-				RelativePath=".\lzham_waitable_lock.h"
 				>
 			</File>
 		</Filter>
