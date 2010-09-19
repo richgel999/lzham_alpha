@@ -26,3 +26,6 @@ Fyffe1-3 are all fast fixed-point implementations of Fyffe's approach, but they 
  Fyffe3 is like Fyffe2, except it uses fixed-point math to compare and compute probabilities. This requires an integer mul per symbol. The scale was arbitrarily set to 64.
  
 I did not record timings in this test, just ratios. From a code complexity standpoint, [http://www.ezcodesample.com/prefixer/prefixer_article.html Polar's] method is probably the simplest/most direct approach.
+
+Another approach that resembles the Polar/Fyffe methods is described here (Algorithm1):
+[http://www.google.com/url?sa=t&source=web&cd=1&ved=0CBIQFjAA&url=http%3A%2F%2Fciteseerx.ist.psu.edu%2Fviewdoc%2Fdownload%3Fdoi%3D10.1.1.124.4466%26rep%3Drep1%26type%3Dpdf&ei=_4SWTNq-KYzSsAPJ7vzkCQ&usg=AFQjCNHqEAQlLiZsD3j12clMjMT_cLoqTw&sig2=_m48LX6xhLfbCMPDthIRJA Reducing the Length of Shannon-Fano Codes and Shannon-Fano-Elias Codes]
