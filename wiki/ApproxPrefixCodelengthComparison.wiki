@@ -21,7 +21,7 @@ Shannon-Fano is a mostly straightforward, by the books recursive implementation 
 Fyffe1-3 are all fast fixed-point implementations of Fyffe's approach, but they differ on how they compute symbol "unhappiness":
  Fyffe1 directly compares the symbol's original frequency vs. the symbol's current effective frequency (based off the current codelength vs. the desired total pow2 frequency) to decide if the symbol's codelength should be promoted to the next smallest size. Fyffe1 turns out to be very similar to Polar's method, except Fyffe1 directly adjusts codelengths, while Polar's method directly adjusts frequencies.
  
- Fyffe2 uses FP math to compare the symbol's original probability vs. the adjusted probability. This requires an FP multiply/compare per symbol.
+ Fyffe2 uses FP math to compare the symbol's original probability vs. the effective probability. This requires an FP multiply/compare per symbol.
  
  Fyffe3 is like Fyffe2, except it uses fixed-point math to compare and compute probabilities. This requires an integer mul per symbol. The scale was arbitrarily set to 64.
  
