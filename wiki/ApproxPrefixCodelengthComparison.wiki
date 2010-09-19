@@ -2,7 +2,7 @@
 
 == Shannon-Fano, Huffman, Polar, and Fyffe Showdown ==
 
-I added support for [http://en.wikipedia.org/wiki/Shannon-Fano_coding Shannon-Fano] codes, along with several variants of [http://code.google.com/p/lzham/wiki/FyffeCodes Fyffe's] approximate codelength generation method to LZHAM. Here are the resulting compression ratios using the latest non-released alpha version of the compressor (alpha5) on enwik9 for all of the implemented techniques:
+I added support for [http://en.wikipedia.org/wiki/Shannon-Fano_coding Shannon-Fano] codes, along with several variants of [http://code.google.com/p/lzham/wiki/FyffeCodes Fyffe's] approximate codelength generation method to LZHAM. Here are the resulting compression ratios using the latest non-released alpha version of the compressor (alpha5) on enwik9 for each approach:
 
 {{{
 File: enwik9, Original Size 1,000,000,000
@@ -18,13 +18,11 @@ Huffman: 					 	202,012,593 	79.7987407
 
 Shannon-Fano is a mostly straightforward, by the books recursive implementation of the well known technique.
 
-Fyffe1-3 differ on how they compute symbol "unhappiness":
- Fyffe1 directly compares the symbol's original frequency vs. the symbol's current effective frequency (based off the current codelength) to decide if 
- the symbol's codelength should be promoted to the next smallest. Fyffe1 turns out to be just like Polar's method, except Fyffe1 directly adjusts
- codelengths, while Polar's method directly adjusts frequencies.
+Fyffe1-3 are all fast fixed-point implementations of Fyffe's approach, but they differ on how they compute symbol "unhappiness":
+ Fyffe1 directly compares the symbol's original frequency vs. the symbol's current effective frequency (based off the current codelength vs. the desired total pow2 frequency) to decide if the symbol's codelength should be promoted to the next smallest size. Fyffe1 turns out to be very similar to Polar's method, except Fyffe1 directly adjusts codelengths, while Polar's method directly adjusts frequencies.
  
  Fyffe2 uses FP math to compare the symbol's original probability vs. the adjusted probability. This requires an FP multiply/compare per symbol.
  
  Fyffe3 is like Fyffe2, except it uses fixed-point math to compare and compute probabilities. This requires an integer mul per symbol. The scale was arbitrarily set to 64.
  
-I did not record timings in this test, just ratios. From a code complexity standpoint, [http://www.ezcodesample.com/prefixer/prefixer_article.html Polar's] method is the simplest/most direct approach.
+I did not record timings in this test, just ratios. From a code complexity standpoint, [http://www.ezcodesample.com/prefixer/prefixer_article.html Polar's] method is probably the simplest/most direct approach.
