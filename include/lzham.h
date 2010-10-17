@@ -23,7 +23,7 @@
 
 // Upper byte = major version
 // Lower byte = minor version
-#define LZHAM_DLL_VERSION        0x1004
+#define LZHAM_DLL_VERSION        0x1005
 
 #ifdef LZHAM_EXPORTS
    #define LZHAM_DLL_EXPORT __declspec(dllexport)
@@ -56,7 +56,7 @@ extern "C" {
    #define LZHAM_MIN_DICT_SIZE_LOG2 15
    #define LZHAM_MAX_DICT_SIZE_LOG2_X86 26
    #define LZHAM_MAX_DICT_SIZE_LOG2_X64 29
-   
+
    #define LZHAM_MAX_HELPER_THREADS 16
 
    enum lzham_compress_status_t
@@ -84,7 +84,7 @@ extern "C" {
       LZHAM_COMP_LEVEL_DEFAULT,
       LZHAM_COMP_LEVEL_BETTER,
       LZHAM_COMP_LEVEL_UBER,
-      
+
       LZHAM_TOTAL_COMP_LEVELS,
 
       LZHAM_COMP_LEVEL_FORCE_DWORD = 0xFFFFFFFF
@@ -209,7 +209,7 @@ public:
    virtual bool load() = 0;
    virtual void unload() = 0;
    virtual bool is_loaded() = 0;
-   
+
    void clear()
    {
       lzham_get_version = NULL;
