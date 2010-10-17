@@ -171,8 +171,11 @@
 			/>
 			<Tool
 				Name="VCCLCompilerTool"
-				Optimization="2"
+				Optimization="3"
+				InlineFunctionExpansion="2"
 				EnableIntrinsicFunctions="true"
+				FavorSizeOrSpeed="1"
+				OmitFramePointers="true"
 				AdditionalIncludeDirectories="..\include"
 				PreprocessorDefinitions="WIN32;NDEBUG;_LIB"
 				ExceptionHandling="0"
@@ -240,8 +243,11 @@
 			/>
 			<Tool
 				Name="VCCLCompilerTool"
-				Optimization="2"
+				Optimization="3"
+				InlineFunctionExpansion="2"
 				EnableIntrinsicFunctions="true"
+				FavorSizeOrSpeed="1"
+				OmitFramePointers="true"
 				AdditionalIncludeDirectories="..\include"
 				PreprocessorDefinitions="WIN32;NDEBUG;_LIB"
 				ExceptionHandling="0"
@@ -304,11 +310,11 @@
 				>
 			</File>
 			<File
-				RelativePath=".\lzham_lzbase.cpp"
+				RelativePath=".\lzham_lzdecomp.cpp"
 				>
 			</File>
 			<File
-				RelativePath=".\lzham_lzdecomp.cpp"
+				RelativePath=".\lzham_lzdecompbase.cpp"
 				>
 			</File>
 			<File
@@ -374,7 +380,7 @@
 				>
 			</File>
 			<File
-				RelativePath=".\lzham_lzbase.h"
+				RelativePath=".\lzham_lzdecompbase.h"
 				>
 			</File>
 			<File
@@ -436,7 +442,15 @@
 				>
 			</File>
 			<File
+				RelativePath="..\include\lzham_dynamic_lib.h"
+				>
+			</File>
+			<File
 				RelativePath="..\include\lzham_exports.inc"
+				>
+			</File>
+			<File
+				RelativePath="..\include\lzham_static_lib.h"
 				>
 			</File>
 		</Filter>

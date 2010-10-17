@@ -1,4 +1,4 @@
-// File: lzham_lzbase.h
+// File: lzham_lzdecompbase.h
 //
 // Copyright (c) 2009-2010 Richard Geldreich, Jr. <richgel99@gmail.com>
 //
@@ -21,11 +21,14 @@
 // THE SOFTWARE.
 #pragma once
 
+//#define LZHAM_LZDEBUG
+
+#define LZHAM_COMPUTE_IS_MATCH_MODEL_INDEX(prev_char, cur_state) ((prev_char) >> (8 - CLZDecompBase::cNumIsMatchContextBits)) + ((cur_state) << CLZDecompBase::cNumIsMatchContextBits)
+
 namespace lzham
 {
-   class CLZBase
+   struct CLZDecompBase
    {
-   public:
       enum 
       {
          cMinMatchLen = 2U,
@@ -34,7 +37,7 @@ namespace lzham
          cMinDictSizeLog2 = 15,
          cMaxDictSizeLog2 = 29,
                   
-         cMatchHistSize = 3,
+         cMatchHistSize = 4,
          cMaxLen2MatchDist = 2047
       };
 
@@ -50,7 +53,7 @@ namespace lzham
       enum
       {
          cLZXSpecialCodeEndOfBlockCode = 0,
-         cLZXSpecialCodeResetStatePartial = 1
+         cLZXSpecialCodePartialStateReset = 1
       };
       
       enum
@@ -72,11 +75,11 @@ namespace lzham
       {
          cNumStates = 12,
          cNumLitStates = 7,
-         
-         cNumLitPredBits = 6,
-         cNumDeltaLitPredBits = 6,
-         
-         cNumIsMatchContextBits = 4
+
+         cNumLitPredBits = 6,          // must be even
+         cNumDeltaLitPredBits = 6,     // must be even
+
+         cNumIsMatchContextBits = 6
       };
       
       uint m_dict_size_log2;
@@ -84,43 +87,10 @@ namespace lzham
       
       uint m_num_lzx_slots;
       uint m_lzx_position_base[cLZXMaxPositionSlots];
-      uint8 m_lzx_position_extra_bits[cLZXMaxPositionSlots];
       uint m_lzx_position_extra_mask[cLZXMaxPositionSlots];
+      uint8 m_lzx_position_extra_bits[cLZXMaxPositionSlots];
       
-      uint8 m_slot_tab0[4096];
-      uint8 m_slot_tab1[512];
-      uint8 m_slot_tab2[256];
-
       void init_position_slots(uint dict_size_log2);
-      
-      inline void compute_lzx_position_slot(uint dist, uint& slot, uint& ofs)
-      {
-         uint s;
-         if (dist < 0x1000)
-            s = m_slot_tab0[dist];
-         else if (dist < 0x100000)
-            s = m_slot_tab1[dist >> 11];
-         else if (dist < 0x1000000)
-            s = m_slot_tab2[dist >> 16];
-         else if (dist < 0x2000000)
-            s = 48 + ((dist - 0x1000000) >> 23);
-         else if (dist < 0x4000000)
-            s = 50 + ((dist - 0x2000000) >> 24);
-         else 
-            s = 52 + ((dist - 0x4000000) >> 25);
-               
-         ofs = (dist - m_lzx_position_base[s]) & m_lzx_position_extra_mask[s];
-         slot = s;
-         
-         LZHAM_ASSERT(s < m_num_lzx_slots);
-         LZHAM_ASSERT((m_lzx_position_base[slot] + ofs) == dist);
-         LZHAM_ASSERT(ofs < (1U << m_lzx_position_extra_bits[slot]));
-      }
    };
-         
-   //#define LZVERIFY
    
-   //#define LZDEBUG
-   //#define LZDISABLE_RAW_BLOCKS
-
 } // namespace lzham

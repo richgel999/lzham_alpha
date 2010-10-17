@@ -62,11 +62,13 @@ namespace lzham
    LZHAM_DEFINE_BUILT_IN_TYPE(unsigned int)
    LZHAM_DEFINE_BUILT_IN_TYPE(long)
    LZHAM_DEFINE_BUILT_IN_TYPE(unsigned long)
-   LZHAM_DEFINE_BUILT_IN_TYPE(__int64)
-   LZHAM_DEFINE_BUILT_IN_TYPE(unsigned __int64)
    LZHAM_DEFINE_BUILT_IN_TYPE(float)
    LZHAM_DEFINE_BUILT_IN_TYPE(double)
    LZHAM_DEFINE_BUILT_IN_TYPE(long double)
+   #if defined(WIN32)
+      LZHAM_DEFINE_BUILT_IN_TYPE(__int64)
+      LZHAM_DEFINE_BUILT_IN_TYPE(unsigned __int64)
+   #endif
 
 #undef LZHAM_DEFINE_BUILT_IN_TYPE
 
@@ -124,7 +126,7 @@ namespace lzham
 
    namespace helpers
    {
-      template <typename T> 
+      template <typename T>
       inline void construct_array(T* p, uint n)
       {
          if (LZHAM_IS_SCALAR_TYPE(T))
@@ -138,7 +140,7 @@ namespace lzham
                new (static_cast<void*>(p)) T;
          }
       }
-      
+
       template <typename T>
       inline void destruct_array(T* p, uint n)
       {

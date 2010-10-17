@@ -26,7 +26,7 @@ namespace lzham
    namespace prefix_coding
    {
       const uint cMaxExpectedCodeSize = 16;
-      const uint cMaxSupportedSyms = 8192;
+      const uint cMaxSupportedSyms = 1024;
       const uint cMaxTableBits = 11;
 
       bool limit_max_code_size(uint num_syms, uint8* pCodesizes, uint max_code_size);

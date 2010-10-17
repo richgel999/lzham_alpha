@@ -209,6 +209,10 @@
 			RelativePath=".\lzham_api.cpp"
 			>
 		</File>
+      <File
+			RelativePath=".\lzham_dll_main.cpp"
+			>
+		</File>
 		<File
 			RelativePath=".\lzhamdll.def"
 			>

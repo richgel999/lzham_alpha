@@ -1,10 +1,10 @@
-LZHAM Codec - Alpha4 - Released Sept. 5, 2010
+LZHAM Codec - Alpha5 - Released Oct. 17, 2010
 Copyright (c) 2009-2010 Richard Geldreich, Jr. <richgel99@gmail.com>
 MIT License - http://code.google.com/p/lzham/
 
 lzhamtest_x86/x64 is a simple command line test program that uses the LZHAM codec DLL to compress/decompress single files.
 
-Usage examples:
+-- Usage examples:
 
 - Compress single file "source_filename" to "compressed_filename":
 	lzhamtest_x64 c source_filename compressed_filename
@@ -18,7 +18,7 @@ Usage examples:
 - Recursively compress all files under specified directory and verify that each file decompresses properly:
 	lzhamtest_x64 -v a c:\source_path
 	
-Options	
+-- Options	
 	
 - Set dictionary size used during compressed to 1MB (2^20):
 	lzhamtest_x64 -d20 c source_filename compressed_filename
@@ -38,22 +38,32 @@ The x86 version defaults to 64MB (26), and the x64 version defaults to 256MB (28
 
 See lzhamtest_x86/x64.exe's usage text for more command line parameters.
 
-Compiling LZHAM
+-- Compiling LZHAM
 
-Out of the box, LZHAM can be compiled with Visual Studio 2008 (preferred) or with Codeblocks 10.05 using TDM-GCC x64 (GCC 4.5.0). 
+- Linux
+Alpha5 now supports the pthreads API for threading and GCC built-ins for atomic operations. I've included a Codeblocks project 
+"lzhamtest_linux.workspace" that's been tested under 32-bit Ubuntu (Lucid Lynx), The Linux version currently only supports linking statically 
+against the LZHAM comp/decomp libs, hasn't been built/tested under 64-bit Linux, and doesn't include makefiles yet.
+
+I've successfully used cbp2mak to create makefiles from the lzham .cbp files:
+http://bblean.berlios.de/cbp2mak-0.2.zip
+
+- Windows/Xbox 360
+LZHAM can be compiled with Visual Studio 2008 (preferred) or with Codeblocks 10.05 using TDM-GCC x64 (GCC 4.5.0). 
 http://www.codeblocks.org/
 http://tdm-gcc.tdragon.net/
 
 Visual Studio 2008 solution is "lzham.sln". The codec seems to compile and run fine with Visual Studio 2010 in my limited testing.
 
-The codec compiles for Xbox 360 as well: lzham_x360.sln. Note that I barely spent any time verifying the codec on this platform.
+The codec compiles for Xbox 360 as well: lzham_x360.sln. Note that I barely spent any time verifying the codec on this platform. 
+I made sure Alpha5 compiles for Xbox 360 but has not been retested in a while. I plan on throughly testing the codec on Xbox 360 when time permits.
 
 The Codeblocks workspace is "lzhamtest.workspace". The codec runs a bit slower when compiled with GCC, but the difference is less than 5%.
 
-Porting LZHAM
+- ANSI C/C++
 
-The decompressor LIB relies on the Win32 fiber API to easily support streaming. This will probably be the biggest stumbling block to porting the decompressor 
-to a non-Win32 platform.
+LZHAM Alpha5 also supports plain vanilla ANSI C/C++. To see how the codec configures itself check out lzham_core.h and search for "LZHAM_ANSI_CPLUSPLUS". 
+All platform specific stuff (unaligned loads, threading, atomic ops, etc.) should be disabled when this macro is defined. Note, the compressor doesn't use threads 
+or atomic operations when built this way so it's going to be pretty slow. (The compressor was built from the ground up to be threaded.)
 
-The compressor LIB relies on the Win32 semaphore and threading API's. Long term, I plan on adding support for pthreads.
 

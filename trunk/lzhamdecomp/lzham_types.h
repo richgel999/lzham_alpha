@@ -58,7 +58,7 @@ namespace lzham
    const int64 INT64_MIN = (int64)0x8000000000000000ULL; //(-9223372036854775807i64 - 1);
    const int64 INT64_MAX = (int64)0x7FFFFFFFFFFFFFFFULL; //9223372036854775807i64;
 
-#ifdef LZHAM_PLATFORM_PC_X64
+#if LZHAM_64BIT_POINTERS
    typedef unsigned __int64 uint_ptr;
    typedef unsigned __int64 uint32_ptr;
    typedef signed __int64   signed_size_t;
@@ -71,8 +71,7 @@ namespace lzham
    typedef uint32 ptr_bits_t;
    const ptr_bits_t PTR_BITS_XOR = 0x5C87DCF7UL;
 #endif
-   #define LZHAM_LOWEST_USABLE_ADDRESS ((void*)0x10000)
-
+   
    enum
    {
       cInvalidIndex = -1

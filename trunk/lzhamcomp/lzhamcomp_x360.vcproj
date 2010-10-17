@@ -154,6 +154,10 @@
 			UniqueIdentifier="{4FC737F1-C7A5-4376-A066-2A32D752A2FF}"
 			>
 			<File
+				RelativePath=".\lzham_lzbase.cpp"
+				>
+			</File>
+			<File
 				RelativePath=".\lzham_lzcomp.cpp"
 				>
 			</File>
@@ -166,7 +170,7 @@
 				>
 			</File>
 			<File
-				RelativePath=".\lzham_task_pool.cpp"
+				RelativePath=".\lzham_win32_threading.cpp"
 				>
 			</File>
 		</Filter>
@@ -180,6 +184,10 @@
 				>
 			</File>
 			<File
+				RelativePath=".\lzham_lzbase.h"
+				>
+			</File>
+			<File
 				RelativePath=".\lzham_lzcomp_internal.h"
 				>
 			</File>
@@ -188,19 +196,19 @@
 				>
 			</File>
 			<File
-				RelativePath=".\lzham_mutex.h"
+				RelativePath=".\lzham_null_threading.h"
 				>
 			</File>
 			<File
-				RelativePath=".\lzham_semaphore.h"
+				RelativePath=".\lzham_pthreads_threading.h"
 				>
 			</File>
 			<File
-				RelativePath=".\lzham_task_pool.h"
+				RelativePath=".\lzham_threading.h"
 				>
 			</File>
 			<File
-				RelativePath=".\lzham_waitable_lock.h"
+				RelativePath=".\lzham_win32_threading.h"
 				>
 			</File>
 		</Filter>
@@ -218,7 +226,15 @@
 				>
 			</File>
 			<File
+				RelativePath="..\include\lzham_dynamic_lib.h"
+				>
+			</File>
+			<File
 				RelativePath="..\include\lzham_exports.inc"
+				>
+			</File>
+			<File
+				RelativePath="..\include\lzham_static_lib.h"
 				>
 			</File>
 		</Filter>

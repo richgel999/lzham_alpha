@@ -1,1 +1,65 @@
 # depslib dependency file v1.0
+1286068297 source:e:\lzham\lzham_a10\lzhamdll\lzham_dll_main.cpp
+	"lzham_core.h"
+	"lzham_decomp.h"
+	"lzham_comp.h"
+	<windows.h>
+
+1286075627 e:\lzham\lzham_a10\lzhamdecomp\lzham_core.h
+	<xtl.h>
+	<windows.h>
+	<stdlib.h>
+	<stdio.h>
+	<math.h>
+	<malloc.h>
+	<stdarg.h>
+	<memory.h>
+	<limits.h>
+	<algorithm>
+	<errno.h>
+	"lzham.h"
+	"lzham_config.h"
+	"lzham_types.h"
+	"lzham_assert.h"
+	"lzham_platform.h"
+	"lzham_helpers.h"
+	"lzham_traits.h"
+	"lzham_mem.h"
+	"lzham_math.h"
+	"lzham_utils.h"
+	"lzham_vector.h"
+
+1286071418 e:\lzham\lzham_a10\include\lzham.h
+
+1285656650 e:\lzham\lzham_a10\lzhamdecomp\lzham_config.h
+
+1285663429 e:\lzham\lzham_a10\lzhamdecomp\lzham_types.h
+
+1285663720 e:\lzham\lzham_a10\lzhamdecomp\lzham_assert.h
+
+1286078592 e:\lzham\lzham_a10\lzhamdecomp\lzham_platform.h
+
+1283158587 e:\lzham\lzham_a10\lzhamdecomp\lzham_helpers.h
+
+1286071144 e:\lzham\lzham_a10\lzhamdecomp\lzham_traits.h
+
+1285052937 e:\lzham\lzham_a10\lzhamdecomp\lzham_mem.h
+
+1285918352 e:\lzham\lzham_a10\lzhamdecomp\lzham_math.h
+	<intrin.h>
+
+1283158587 e:\lzham\lzham_a10\lzhamdecomp\lzham_utils.h
+
+1283735842 e:\lzham\lzham_a10\lzhamdecomp\lzham_vector.h
+
+1283158587 e:\lzham\lzham_a10\lzhamdecomp\lzham_decomp.h
+	"lzham.h"
+
+1283158587 e:\lzham\lzham_a10\lzhamcomp\lzham_comp.h
+	"lzham.h"
+
+1286068307 source:e:\lzham\lzham_a10\lzhamdll\lzham_api.cpp
+	"lzham_core.h"
+	"lzham_decomp.h"
+	"lzham_comp.h"
+

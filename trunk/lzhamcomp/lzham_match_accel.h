@@ -21,7 +21,7 @@
 // THE SOFTWARE.
 #pragma once
 #include "lzham_lzbase.h"
-#include "lzham_task_pool.h"
+#include "lzham_threading.h"
 
 namespace lzham
 {
@@ -67,12 +67,16 @@ namespace lzham
       inline uint get_lookahead_size() const { return m_lookahead_size; }
       
       inline uint get_char(int delta_pos) const { return m_dict[(m_lookahead_pos + delta_pos) & m_max_dict_size_mask]; }
+      inline uint get_char(uint cur_dict_pos, int delta_pos) const { return m_dict[(cur_dict_pos + delta_pos) & m_max_dict_size_mask]; }
       inline const uint8* get_ptr(uint pos) const { return &m_dict[pos]; }
+      
+      uint get_max_helper_threads() const { return m_max_helper_threads; }
       
       inline uint operator[](uint pos) const { return m_dict[pos]; }
             
       uint get_max_add_bytes() const;
       bool add_bytes_begin(uint num_bytes, const uint8* pBytes);
+      inline atomic32_t get_num_completed_helper_threads() const { return m_num_completed_helper_threads; }
       void add_bytes_end();
       
       uint get_len2_match(uint lookahead_ofs);
@@ -89,7 +93,7 @@ namespace lzham
             return 0;
 
          const uint comp_pos = static_cast<uint>((m_lookahead_pos + lookahead_ofs - dist) & m_max_dict_size_mask);
-         const uint lookahead_pos = m_lookahead_pos + lookahead_ofs;
+         const uint lookahead_pos = (m_lookahead_pos + lookahead_ofs) & m_max_dict_size_mask;
          
          const uint8* pComp = &m_dict[comp_pos];
          const uint8* pLookahead = &m_dict[lookahead_pos];
@@ -101,7 +105,7 @@ namespace lzham
 
          return match_len;
       }
-            
+                  
    public:
       CLZBase* m_pLZBase;
       task_pool* m_pTask_pool;
@@ -122,7 +126,7 @@ namespace lzham
       lzham::vector<node> m_nodes;
 
       lzham::vector<dict_match> m_matches;
-      lzham::vector<LONG> m_match_refs;
+      lzham::vector<atomic32_t> m_match_refs;
       
       lzham::vector<uint8> m_hash_thread_index;
       
@@ -138,7 +142,9 @@ namespace lzham
       
       bool m_all_matches;
                   
-      volatile LONG m_next_match_ref;
+      volatile atomic32_t m_next_match_ref;
+      
+      volatile atomic32_t m_num_completed_helper_threads;
                   
       void find_all_matches_callback(uint64 data, void* pData_ptr);
       bool find_all_matches(uint num_bytes);

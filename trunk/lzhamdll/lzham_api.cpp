@@ -23,25 +23,6 @@
 #include "lzham_decomp.h"
 #include "lzham_comp.h"
 
-BOOL APIENTRY DllMain(HANDLE hModule, DWORD fdwReason, LPVOID lpReserved)
-{
-   hModule, fdwReason, lpReserved;
-
-   switch( fdwReason ) 
-   { 
-      case DLL_PROCESS_ATTACH:
-      {
-         break;
-      }
-      case DLL_PROCESS_DETACH:
-      {
-         break;
-      }
-   }
-
-   return TRUE;
-}
-
 extern "C" LZHAM_DLL_EXPORT lzham_uint32 lzham_get_version(void)
 {
    return LZHAM_DLL_VERSION;
@@ -99,3 +80,4 @@ extern "C" LZHAM_DLL_EXPORT lzham_compress_status_t lzham_compress_memory(const 
 {
    return lzham::lzham_lib_compress_memory(pParams, pDst_buf, pDst_len, pSrc_buf, src_len, pAdler32);
 }
+

@@ -21,7 +21,7 @@
 // THE SOFTWARE.
 #pragma once
 
-#if defined(LZHAM_USE_X86_INTRINSICS) && !defined(__MINGW32__)
+#if defined(LZHAM_USE_MSVC_INTRINSICS) && !defined(__MINGW32__)
    #include <intrin.h>
    #if defined(_MSC_VER)
       #pragma intrinsic(_BitScanReverse)
@@ -113,7 +113,7 @@ namespace lzham
          {
             l = 32 -__builtin_clz(v);
          }
-#elif defined(LZHAM_USE_X86_INTRINSICS)
+#elif defined(LZHAM_USE_MSVC_INTRINSICS)
          if (_BitScanReverse(&l, v))
          {
             l++;

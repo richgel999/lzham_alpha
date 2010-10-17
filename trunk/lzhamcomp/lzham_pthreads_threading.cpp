@@ -1,4 +1,4 @@
-// File: lzham_task_pool.cpp
+// File: lzham_task_pool_pthreads.cpp
 //
 // Copyright (c) 2009-2010 Richard Geldreich, Jr. <richgel99@gmail.com>
 //
@@ -20,9 +20,18 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 // THE SOFTWARE.
 #include "lzham_core.h"
-#include "lzham_task_pool.h"
+#include "lzham_pthreads_threading.h"
 #include "lzham_timer.h"
+
+#ifdef WIN32
 #include <process.h>
+#endif
+
+#if LZHAM_USE_PTHREADS_API
+
+#ifdef WIN32
+#pragma comment(lib, "../ext/libpthread/lib/pthreadVC2.lib")
+#endif
 
 namespace lzham
 {
@@ -64,10 +73,8 @@ namespace lzham
       m_num_threads = 0;
       while (m_num_threads < num_threads)
       {
-         m_threads[m_num_threads] = (HANDLE)_beginthreadex(NULL, 32768, thread_func, this, 0, NULL);
-         LZHAM_ASSERT(m_threads[m_num_threads] != 0);
-
-         if (!m_threads[m_num_threads])
+         int status = pthread_create(&m_threads[m_num_threads], NULL, thread_func, this);
+         if (status)
          {
             succeeded = false;
             break;
@@ -91,29 +98,16 @@ namespace lzham
       {
          join();
 
-         InterlockedExchange(&m_exit_flag, true);
+         atomic_exchange32(&m_exit_flag, true);
 
          m_tasks_available.release(m_num_threads);
 
          for (uint i = 0; i < m_num_threads; i++)
-         {
-            if (m_threads[i])
-            {
-               for ( ; ; )
-               {
-                  DWORD result = WaitForSingleObject(m_threads[i], 30000);
-                  if ((result == WAIT_OBJECT_0) || (result == WAIT_ABANDONED))
-                     break;
-               }
-
-               CloseHandle(m_threads[i]);
-               m_threads[i] = NULL;
-            }
-         }
+            pthread_join(m_threads[i], NULL);
 
          m_num_threads = 0;
 
-         InterlockedExchange(&m_exit_flag, false);
+         atomic_exchange32(&m_exit_flag, false);
       }
 
       m_task_stack.clear();
@@ -134,7 +128,7 @@ namespace lzham
       if (!m_task_stack.try_push(tsk))
          return false;
 
-      InterlockedIncrement(&m_num_outstanding_tasks);
+      atomic_increment32(&m_num_outstanding_tasks);
 
       m_tasks_available.release(1);
 
@@ -156,7 +150,7 @@ namespace lzham
       if (!m_task_stack.try_push(tsk))
          return false;
 
-      InterlockedIncrement(&m_num_outstanding_tasks);
+      atomic_increment32(&m_num_outstanding_tasks);
 
       m_tasks_available.release(1);
 
@@ -170,28 +164,29 @@ namespace lzham
       else
          tsk.m_callback(tsk.m_data, tsk.m_pData_ptr);
 
-      InterlockedDecrement(&m_num_outstanding_tasks);
+      atomic_decrement32(&m_num_outstanding_tasks);
    }
 
    void task_pool::join()
    {
-      while (lzham_interlocked_add(&m_num_outstanding_tasks, 0) > 0)
+      task tsk;
+      while (atomic_add32(&m_num_outstanding_tasks, 0) > 0)
       {
-         task tsk;
          if (m_task_stack.pop(tsk))
          {
             process_task(tsk);
          }
          else
          {
-            Sleep(1);
+            lzham_sleep(1);
          }
       }
    }
 
-   unsigned __stdcall task_pool::thread_func(void* pContext)
+   void * task_pool::thread_func(void *pContext)
    {
       task_pool* pPool = static_cast<task_pool*>(pContext);
+      task tsk;
 
       for ( ; ; )
       {
@@ -201,15 +196,15 @@ namespace lzham
          if (pPool->m_exit_flag)
             break;
 
-         task tsk;
          if (pPool->m_task_stack.pop(tsk))
          {
             pPool->process_task(tsk);
          }
       }
 
-      _endthreadex(0);
-      return 0;
+      return NULL;
    }
 
 } // namespace lzham
+
+#endif // LZHAM_USE_PTHREADS_API

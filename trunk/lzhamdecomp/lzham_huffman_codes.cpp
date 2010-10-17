@@ -140,7 +140,7 @@ namespace lzham
          pNew_syms = t;
       }            
 
-#ifdef LZHAM_ASSERTS_ENABLED
+#if LZHAM_ASSERTS_ENABLED
       uint prev_freq = 0;
       for (uint i = 0; i < num_syms; i++)
       {
@@ -158,8 +158,10 @@ namespace lzham
       
       sym_freq syms0[cHuffmanMaxSupportedSyms + 1 + cMaxInternalNodes];
       sym_freq syms1[cHuffmanMaxSupportedSyms + 1 + cMaxInternalNodes];
-                  
+
+#if !USE_CALCULATE_MINIMUM_REDUNDANCY                  
       uint16 queue[cMaxInternalNodes];
+#endif      
    };
    
    uint get_generate_huffman_codes_table_size()
@@ -277,6 +279,8 @@ namespace lzham
       }
       max_code_size = max_len;
 #else    
+      // Computes Huffman codelengths in linear time. More readable than calculate_minimum_redundancy(), and approximately the same speed, but not in-place.
+      
       // Dummy node
       sym_freq& sf = state.syms0[num_used_syms];
       sf.m_left = UINT16_MAX;

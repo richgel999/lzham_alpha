@@ -29,10 +29,9 @@ void lzham_fail(const char* pExp, const char* pFile, unsigned line);
 
 #ifdef NDEBUG
    #define LZHAM_ASSERT(x) ((void)0)
-   #undef  LZHAM_ASSERTS_ENABLED
 #else
    #define LZHAM_ASSERT(_exp) (void)( (!!(_exp)) || (lzham_assert(#_exp, __FILE__, __LINE__), 0) )
-   #define LZHAM_ASSERTS_ENABLED
+   #define LZHAM_ASSERTS_ENABLED 1
 #endif
 
 #define LZHAM_VERIFY(_exp) (void)( (!!(_exp)) || (lzham_assert(#_exp, __FILE__, __LINE__), 0) )
@@ -42,8 +41,8 @@ void lzham_fail(const char* pExp, const char* pFile, unsigned line);
 #define LZHAM_ASSERT_OPEN_RANGE(x, l, h) LZHAM_ASSERT((x >= l) && (x < h))
 #define LZHAM_ASSERT_CLOSED_RANGE(x, l, h) LZHAM_ASSERT((x >= l) && (x <= h))
 
-void trace(const char* pFmt, va_list args);
-void trace(const char* pFmt, ...);
+void lzham_trace(const char* pFmt, va_list args);
+void lzham_trace(const char* pFmt, ...);
 
 // Borrowed from boost libraries.
 template <bool x>  struct assume_failure;

@@ -1,4 +1,4 @@
-//File: lzham_semaphore.h
+// File: lzham_lzbase.h
 //
 // Copyright (c) 2009-2010 Richard Geldreich, Jr. <richgel99@gmail.com>
 //
@@ -21,55 +21,44 @@
 // THE SOFTWARE.
 #pragma once
 
+#include "lzham_lzdecompbase.h"
+
+//#define LZHAM_LZVERIFY
+//#define LZHAM_DISABLE_RAW_BLOCKS
+
 namespace lzham
 {
-   class semaphore
+   struct CLZBase : CLZDecompBase
    {
-      LZHAM_NO_COPY_OR_ASSIGNMENT_OP(semaphore);
-      
-   public:
-      semaphore(LONG initialCount = 0, LONG maximumCount = 1, const char* pName = NULL)
+      uint8 m_slot_tab0[4096];
+      uint8 m_slot_tab1[512];
+      uint8 m_slot_tab2[256];
+
+      void init_slot_tabs();
+
+      inline void compute_lzx_position_slot(uint dist, uint& slot, uint& ofs)
       {
-         m_handle = CreateSemaphoreA(NULL, initialCount, maximumCount, pName);
-         if (NULL == m_handle)
-         {
-            LZHAM_FAIL("semaphore: CreateSemaphore() failed");
-         }
+         uint s;
+         if (dist < 0x1000)
+            s = m_slot_tab0[dist];
+         else if (dist < 0x100000)
+            s = m_slot_tab1[dist >> 11];
+         else if (dist < 0x1000000)
+            s = m_slot_tab2[dist >> 16];
+         else if (dist < 0x2000000)
+            s = 48 + ((dist - 0x1000000) >> 23);
+         else if (dist < 0x4000000)
+            s = 50 + ((dist - 0x2000000) >> 24);
+         else 
+            s = 52 + ((dist - 0x4000000) >> 25);
+
+         ofs = (dist - m_lzx_position_base[s]) & m_lzx_position_extra_mask[s];
+         slot = s;
+
+         LZHAM_ASSERT(s < m_num_lzx_slots);
+         LZHAM_ASSERT((m_lzx_position_base[slot] + ofs) == dist);
+         LZHAM_ASSERT(ofs < (1U << m_lzx_position_extra_bits[slot]));
       }
-
-      ~semaphore()
-      {
-         if (m_handle)
-         {
-            CloseHandle(m_handle);
-            m_handle = NULL;
-         }
-      }
-
-      inline HANDLE get_handle(void) const { return m_handle; }   
-
-      void release(LONG releaseCount = 1, LPLONG pPreviousCount = NULL)
-      {
-         if (0 == ReleaseSemaphore(m_handle, releaseCount, pPreviousCount))
-         {
-            LZHAM_FAIL("semaphore: ReleaseSemaphore() failed");
-         }
-      }
-
-      bool wait(DWORD milliseconds = INFINITE) 
-      {
-         DWORD result = WaitForSingleObject(m_handle, milliseconds);
-
-         if (WAIT_FAILED == result)
-         {
-            LZHAM_FAIL("semaphore: WaitForSingleObject() failed");
-         }
-
-         return WAIT_OBJECT_0 == result;
-      }      
-
-   private:   
-      HANDLE m_handle;
    };
 
 } // namespace lzham

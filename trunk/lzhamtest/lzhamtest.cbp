@@ -12,7 +12,7 @@
 				<Option object_output="obj\Debug_x86\" />
 				<Option type="1" />
 				<Option compiler="gcc" />
-				<Option parameters="d 1 2" />
+				<Option parameters="-v -d26 c E:\dev\corpus\adobe.7z 1" />
 				<Compiler>
 					<Add option="-g" />
 					<Add option="-m32" />
@@ -73,8 +73,8 @@
 			<Add directory="..\include" />
 		</Compiler>
 		<Unit filename="lzhamtest.cpp" />
-		<Unit filename="win32_timer.cpp" />
-		<Unit filename="win32_timer.h" />
+		<Unit filename="timer.cpp" />
+		<Unit filename="timer.h" />
 		<Extensions>
 			<code_completion />
 			<debugger />

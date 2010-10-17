@@ -32,21 +32,19 @@ namespace lzham
 
    const uint cSymbolCodecArithProbBits = 11;
    const uint cSymbolCodecArithProbScale = 1 << cSymbolCodecArithProbBits;
+   const uint cSymbolCodecArithProbHalfScale = 1 << (cSymbolCodecArithProbBits - 1);
    const uint cSymbolCodecArithProbMoveBits = 5;
 
-   const uint cSymbolCodecArithProbMulBits    = 8;
-   const uint cSymbolCodecArithProbMulScale   = 1 << cSymbolCodecArithProbMulBits;
-   
    extern float gProbCost[cSymbolCodecArithProbScale];
 
-   class quasi_adaptive_huffman_data_model
+   class raw_quasi_adaptive_huffman_data_model
    {
    public:
-      quasi_adaptive_huffman_data_model(bool encoding = true, uint total_syms = 0, bool fast_encoding = false, bool use_polar_codes = false);
-      quasi_adaptive_huffman_data_model(const quasi_adaptive_huffman_data_model& other);
-      ~quasi_adaptive_huffman_data_model();
+      raw_quasi_adaptive_huffman_data_model(bool encoding = true, uint total_syms = 0, bool fast_encoding = false, bool use_polar_codes = false);
+      raw_quasi_adaptive_huffman_data_model(const raw_quasi_adaptive_huffman_data_model& other);
+      ~raw_quasi_adaptive_huffman_data_model();
 
-      quasi_adaptive_huffman_data_model& operator= (const quasi_adaptive_huffman_data_model& rhs);
+      raw_quasi_adaptive_huffman_data_model& operator= (const raw_quasi_adaptive_huffman_data_model& rhs);
 
       void clear();
 
@@ -54,24 +52,26 @@ namespace lzham
       bool reset();
 
       void rescale();
+      void reset_update_rate();
 
       inline uint get_total_syms() const { return m_total_syms; }
       inline uint get_cost(uint sym) const { return m_code_sizes[sym]; }
 
    public:
-      uint                             m_total_syms;
-
-      uint                             m_update_cycle;
-      uint                             m_symbols_until_update;
-
-      uint                             m_total_count;
-
       lzham::vector<uint16>            m_sym_freq;
 
       lzham::vector<uint16>            m_codes;
       lzham::vector<uint8>             m_code_sizes;
 
       prefix_coding::decoder_tables*   m_pDecode_tables;
+
+      uint                             m_total_syms;
+
+      uint                             m_max_cycle;
+      uint                             m_update_cycle;
+      uint                             m_symbols_until_update;
+
+      uint                             m_total_count;
 
       uint8                            m_decoder_table_bits;
       bool                             m_encoding;
@@ -81,6 +81,14 @@ namespace lzham
       bool update();
 
       friend class symbol_codec;
+   };
+
+   struct quasi_adaptive_huffman_data_model : public raw_quasi_adaptive_huffman_data_model
+   {
+#if LZHAM_64BIT_POINTERS
+      // Ensures sizeof(quasi_adaptive_huffman_data_model) is 128 bytes on x64 (it's 64 on x86).
+      char m_unused_alignment[128 - sizeof(raw_quasi_adaptive_huffman_data_model)];
+#endif
    };
 
    class adaptive_bit_model
@@ -105,6 +113,7 @@ namespace lzham
       friend class adaptive_arith_data_model;
    };
 
+   // This class is not actually used by LZHAM - it's only here for comparison/experimental purposes.
    class adaptive_arith_data_model
    {
    public:
@@ -131,7 +140,7 @@ namespace lzham
       friend class symbol_codec;
    };
 
-#if (defined(LZHAM_PLATFORM_X360) || defined(LZHAM_PLATFORM_PC_X64))
+#if LZHAM_CPU_HAS_64BIT_REGISTERS
    #define LZHAM_SYMBOL_CODEC_USE_64_BIT_BUFFER 1
 #else
    #define LZHAM_SYMBOL_CODEC_USE_64_BIT_BUFFER 0
@@ -147,18 +156,12 @@ namespace lzham
       // Encoding
       bool start_encoding(uint expected_file_size);
       bool encode_bits(uint bits, uint num_bits);
+      bool encode_arith_init();
       bool encode_align_to_byte();
       bool encode(uint sym, quasi_adaptive_huffman_data_model& model);
-      bool encode_truncated_binary(uint v, uint n);
-      static uint encode_truncated_binary_cost(uint v, uint n);
-      bool encode_golomb(uint v, uint m);
-      bool encode_rice(uint v, uint m);
-      static uint encode_rice_get_cost(uint v, uint m);
       bool encode(uint bit, adaptive_bit_model& model, bool update_model = true);
       bool encode(uint sym, adaptive_arith_data_model& model);
 
-      inline void encode_enable_simulation(bool enabled) { m_simulate_encoding = enabled; }
-      inline bool encode_get_simulation() { return m_simulate_encoding; }
       inline uint encode_get_total_bits_written() const { return m_total_bits_written; }
 
       bool stop_encoding(bool support_arith);
@@ -171,9 +174,18 @@ namespace lzham
       typedef void (*need_bytes_func_ptr)(size_t num_bytes_consumed, void *pPrivate_data, const uint8* &pBuf, size_t &buf_size, bool &eof_flag);
 
       bool start_decoding(const uint8* pBuf, size_t buf_size, bool eof_flag = true, need_bytes_func_ptr pNeed_bytes_func = NULL, void *pPrivate_data = NULL);
-      void decode_set_input_buffer(const uint8* pBuf, size_t buf_size, const uint8* pBuf_next, bool eof_flag = true);
+
+      inline void decode_set_input_buffer(const uint8* pBuf, size_t buf_size, const uint8* pBuf_next, bool eof_flag)
+      {
+         m_pDecode_buf = pBuf;
+         m_pDecode_buf_next = pBuf_next;
+         m_decode_buf_size = buf_size;
+         m_pDecode_buf_end = pBuf + buf_size;
+         m_decode_buf_eof = eof_flag;
+      }
       inline uint64 decode_get_bytes_consumed() const { return m_pDecode_buf_next - m_pDecode_buf; }
       inline uint64 decode_get_bits_remaining() const { return ((m_pDecode_buf_end - m_pDecode_buf_next) << 3) + m_bit_count; }
+
       void start_arith_decoding();
       uint decode_bits(uint num_bits);
       uint decode_peek_bits(uint num_bits);
@@ -181,9 +193,6 @@ namespace lzham
       void decode_align_to_byte();
       int decode_remove_byte_from_bit_buf();
       uint decode(quasi_adaptive_huffman_data_model& model);
-      uint decode_truncated_binary(uint n);
-      uint decode_golomb(uint m);
-      uint decode_rice(uint m);
       uint decode(adaptive_bit_model& model, bool update_model = true);
       uint decode(adaptive_arith_data_model& model);
       uint64 stop_decoding();
@@ -220,7 +229,12 @@ namespace lzham
       {
          uint m_bits;
 
-         enum { cArithSym = -1, cAlignToByteSym = -2 };
+         enum
+         {
+            cArithSym = -1,
+            cAlignToByteSym = -2,
+            cArithInit = -3
+         };
          int16 m_num_bits;
 
          uint16 m_arith_prob0;
@@ -228,14 +242,14 @@ namespace lzham
       lzham::vector<output_symbol> m_output_syms;
 
       uint                    m_total_bits_written;
-      bool                    m_simulate_encoding;
 
       uint                    m_arith_base;
       uint                    m_arith_value;
       uint                    m_arith_length;
       uint                    m_arith_total_bits;
 
-      bool                    m_support_arith;
+      quasi_adaptive_huffman_data_model*     m_pSaved_huff_model;
+      adaptive_bit_model*                    m_pSaved_bit_model;
 
       bool put_bits_init(uint expected_size);
       bool record_put_bits(uint bits, uint num_bits);
@@ -248,9 +262,8 @@ namespace lzham
       bool put_bits(uint bits, uint num_bits);
       bool put_bits_align_to_byte();
       bool flush_bits();
-      bool assemble_output_buf(bool support_arith);
+      bool assemble_output_buf();
 
-      void get_bits_init();
       uint get_bits(uint num_bits);
       void remove_bits(uint num_bits);
 
@@ -264,213 +277,224 @@ namespace lzham
       } m_mode;
    };
 
-#define LZHAM_SYMBOL_CODEC_USE_MACROS 1
+#define LZHAM_SYMBOL_CODEC_DECODE_DECLARE(codec) \
+   uint arith_value = 0; \
+   uint arith_length = 0; \
+   symbol_codec::bit_buf_t bit_buf = 0; \
+   int bit_count = 0; \
+   const uint8* pDecode_buf_next = NULL;
 
-// Note: It's very important that LZHAM_READ_BIG_ENDIAN_UINT32() is fast on the target platform.
-// This is used to read every DWORD from the input stream.
+#define LZHAM_SYMBOL_CODEC_DECODE_BEGIN(codec) \
+   arith_value = codec.m_arith_value; \
+   arith_length = codec.m_arith_length; \
+   bit_buf = codec.m_bit_buf; \
+   bit_count = codec.m_bit_count; \
+   pDecode_buf_next = codec.m_pDecode_buf_next;
 
-#ifdef LZHAM_PLATFORM_X360
-   #define LZHAM_READ_BIG_ENDIAN_UINT32(p) *reinterpret_cast<const uint32*>(p)
-#elif defined(LZHAM_USE_X86_INTRINSICS)
-   #define LZHAM_READ_BIG_ENDIAN_UINT32(p) _byteswap_ulong(*reinterpret_cast<const uint32*>(p))
-#elif defined(LZHAM_LITTLE_ENDIAN_CPU)
-   // This reads unaligned DWORD's - likely to be unsafe on some platforms.
-   #define LZHAM_READ_BIG_ENDIAN_UINT32(p) utils::swap32(*reinterpret_cast<const uint32*>(p))
-#else
-   // This reads unaligned DWORD's - likely to be unsafe on some platforms.
-   #define LZHAM_READ_BIG_ENDIAN_UINT32(p) *reinterpret_cast<const uint32*>(p)
-#endif
+#define LZHAM_SYMBOL_CODEC_DECODE_END(codec) \
+   codec.m_arith_value = arith_value; \
+   codec.m_arith_length = arith_length; \
+   codec.m_bit_buf = bit_buf; \
+   codec.m_bit_count = bit_count; \
+   codec.m_pDecode_buf_next = pDecode_buf_next;
 
-#if LZHAM_SYMBOL_CODEC_USE_MACROS
-   #define LZHAM_SYMBOL_CODEC_DECODE_DECLARE(codec) \
-      uint arith_value; \
-      uint arith_length; \
-      symbol_codec::bit_buf_t bit_buf; \
-      int bit_count; \
-      const uint8* pDecode_buf_next;
+// The user must declare the LZHAM_DECODE_NEEDS_BYTES macro.
 
-   #define LZHAM_SYMBOL_CODEC_DECODE_BEGIN(codec) \
-      arith_value = codec.m_arith_value; \
-      arith_length = codec.m_arith_length; \
-      bit_buf = codec.m_bit_buf; \
-      bit_count = codec.m_bit_count; \
-      pDecode_buf_next = codec.m_pDecode_buf_next;
-
-   #define LZHAM_SYMBOL_CODEC_DECODE_END(codec) \
-      codec.m_arith_value = arith_value; \
-      codec.m_arith_length = arith_length; \
-      codec.m_bit_buf = bit_buf; \
-      codec.m_bit_count = bit_count; \
-      codec.m_pDecode_buf_next = pDecode_buf_next;
-
-   #define LZHAM_SYMBOL_CODEC_DECODE_GET_BITS(codec, result, num_bits) \
+#define LZHAM_SYMBOL_CODEC_DECODE_GET_BITS(codec, result, num_bits) \
+{ \
+   while (LZHAM_BUILTIN_EXPECT(bit_count < (int)(num_bits), 0)) \
    { \
-      while (bit_count < (int)(num_bits)) \
+      uint c; \
+      if (LZHAM_BUILTIN_EXPECT(pDecode_buf_next == codec.m_pDecode_buf_end, 0)) \
       { \
-         uint c = 0; \
-         if (pDecode_buf_next == codec.m_pDecode_buf_end) \
+         if (LZHAM_BUILTIN_EXPECT(!codec.m_decode_buf_eof, 1)) \
          { \
             LZHAM_SYMBOL_CODEC_DECODE_END(codec) \
-            codec.decode_need_bytes(); \
+            LZHAM_DECODE_NEEDS_BYTES \
             LZHAM_SYMBOL_CODEC_DECODE_BEGIN(codec) \
-            if (pDecode_buf_next < codec.m_pDecode_buf_end) c = *pDecode_buf_next++; \
          } \
-         else \
-            c = *pDecode_buf_next++; \
-         bit_count += 8; \
-         bit_buf |= (static_cast<symbol_codec::bit_buf_t>(c) << (symbol_codec::cBitBufSize - bit_count)); \
-      } \
-      result = num_bits ? static_cast<uint>(bit_buf >> (symbol_codec::cBitBufSize - (num_bits))) : 0; \
-      bit_buf <<= (num_bits); \
-      bit_count -= (num_bits); \
-   }
-
-   #define LZHAM_SYMBOL_CODEC_DECODE_ARITH_BIT(codec, result, model) \
-   { \
-      while (arith_length < cSymbolCodecArithMinLen) \
-      { \
-         uint c; \
-         LZHAM_SYMBOL_CODEC_DECODE_GET_BITS(codec, c, 8); \
-         arith_value = (arith_value << 8) | c; \
-         arith_length <<= 8; \
-      } \
-      uint x = model.m_bit_0_prob * (arith_length >> cSymbolCodecArithProbBits); \
-      result = (arith_value >= x); \
-      if (!result) \
-      { \
-         model.m_bit_0_prob += ((cSymbolCodecArithProbScale - model.m_bit_0_prob) >> cSymbolCodecArithProbMoveBits); \
-         arith_length = x; \
+         c = 0; \
+         if (LZHAM_BUILTIN_EXPECT(pDecode_buf_next < codec.m_pDecode_buf_end, 1)) c = *pDecode_buf_next++; \
       } \
       else \
-      { \
-         model.m_bit_0_prob -= (model.m_bit_0_prob >> cSymbolCodecArithProbMoveBits); \
-         arith_value  -= x; \
-         arith_length -= x; \
-      } \
-   }
+         c = *pDecode_buf_next++; \
+      bit_count += 8; \
+      bit_buf |= (static_cast<symbol_codec::bit_buf_t>(c) << (symbol_codec::cBitBufSize - bit_count)); \
+   } \
+   result = num_bits ? static_cast<uint>(bit_buf >> (symbol_codec::cBitBufSize - (num_bits))) : 0; \
+   bit_buf <<= (num_bits); \
+   bit_count -= (num_bits); \
+}
+
+#define LZHAM_SYMBOL_CODEC_DECODE_ARITH_BIT(codec, result, model) \
+{ \
+   adaptive_bit_model *pModel; \
+   pModel = &model; \
+   while (LZHAM_BUILTIN_EXPECT(arith_length < cSymbolCodecArithMinLen, 0)) \
+   { \
+      uint c; codec.m_pSaved_bit_model = pModel; \
+      LZHAM_SYMBOL_CODEC_DECODE_GET_BITS(codec, c, 8); \
+      pModel = codec.m_pSaved_bit_model; \
+      arith_value = (arith_value << 8) | c; \
+      arith_length <<= 8; \
+   } \
+   uint x = pModel->m_bit_0_prob * (arith_length >> cSymbolCodecArithProbBits); \
+   result = (arith_value >= x); \
+   if (!result) \
+   { \
+      pModel->m_bit_0_prob += ((cSymbolCodecArithProbScale - pModel->m_bit_0_prob) >> cSymbolCodecArithProbMoveBits); \
+      arith_length = x; \
+   } \
+   else \
+   { \
+      pModel->m_bit_0_prob -= (pModel->m_bit_0_prob >> cSymbolCodecArithProbMoveBits); \
+      arith_value  -= x; \
+      arith_length -= x; \
+   } \
+}
 
 #if LZHAM_SYMBOL_CODEC_USE_64_BIT_BUFFER
-   #define LZHAM_SYMBOL_CODEC_DECODE_ADAPTIVE_HUFFMAN(codec, result, model) \
+#define LZHAM_SYMBOL_CODEC_DECODE_ADAPTIVE_HUFFMAN(codec, result, model) \
+{ \
+   quasi_adaptive_huffman_data_model* pModel; const prefix_coding::decoder_tables* pTables; \
+   pModel = &model; pTables = model.m_pDecode_tables; \
+   if (LZHAM_BUILTIN_EXPECT(bit_count < 24, 0)) \
    { \
-      const prefix_coding::decoder_tables* pTables = model.m_pDecode_tables; \
-      if (bit_count < 24) \
+      uint c; \
+      pDecode_buf_next += sizeof(uint32); \
+      if (LZHAM_BUILTIN_EXPECT(pDecode_buf_next >= codec.m_pDecode_buf_end, 0)) \
       { \
-         uint c = 0; \
-         pDecode_buf_next += sizeof(uint32); \
-         if (pDecode_buf_next >= codec.m_pDecode_buf_end) \
+         pDecode_buf_next -= sizeof(uint32); \
+         while (bit_count < 24) \
          { \
-            pDecode_buf_next -= sizeof(uint32); \
-            while (bit_count < 24) \
+            if (!codec.m_decode_buf_eof) \
             { \
+               codec.m_pSaved_huff_model = pModel; \
                LZHAM_SYMBOL_CODEC_DECODE_END(codec) \
-               codec.decode_need_bytes(); \
+               LZHAM_DECODE_NEEDS_BYTES \
                LZHAM_SYMBOL_CODEC_DECODE_BEGIN(codec) \
-               if (pDecode_buf_next < codec.m_pDecode_buf_end) c = *pDecode_buf_next++; \
-               bit_count += 8; \
-               bit_buf |= (static_cast<symbol_codec::bit_buf_t>(c) << (symbol_codec::cBitBufSize - bit_count)); \
+               pModel = codec.m_pSaved_huff_model; pTables = pModel->m_pDecode_tables; \
             } \
-         } \
-         else \
-         { \
-            c = LZHAM_READ_BIG_ENDIAN_UINT32(pDecode_buf_next - sizeof(uint32)); \
-            bit_count += 32; \
+            c = 0; if (pDecode_buf_next < codec.m_pDecode_buf_end) c = *pDecode_buf_next++; \
+            bit_count += 8; \
             bit_buf |= (static_cast<symbol_codec::bit_buf_t>(c) << (symbol_codec::cBitBufSize - bit_count)); \
          } \
       } \
-      uint k = static_cast<uint>((bit_buf >> (symbol_codec::cBitBufSize - 16)) + 1); \
-      uint len; \
-      if (k <= pTables->m_table_max_code) \
-      { \
-         uint32 t = pTables->m_lookup[bit_buf >> (symbol_codec::cBitBufSize - pTables->m_table_bits)]; \
-         result = t & UINT16_MAX; \
-         len = t >> 16; \
-      } \
       else \
       { \
-         len = pTables->m_decode_start_code_size; \
-         for ( ; ; ) \
-         { \
-            if (k <= pTables->m_max_codes[len - 1]) \
-               break; \
-            len++; \
-         } \
-         int val_ptr = pTables->m_val_ptrs[len - 1] + static_cast<int>(bit_buf >> (symbol_codec::cBitBufSize - len)); \
-         if (((uint)val_ptr >= model.m_total_syms)) val_ptr = 0; \
-         result = pTables->m_sorted_symbol_order[val_ptr]; \
-      }  \
-      bit_buf <<= len; \
-      bit_count -= len; \
-      uint freq = model.m_sym_freq[result]; \
-      freq++; \
-      model.m_sym_freq[result] = static_cast<uint16>(freq); \
-      if (freq == UINT16_MAX) model.rescale(); \
-      if (--model.m_symbols_until_update == 0) \
-      { \
-         model.update(); \
-      } \
-   }
-#else
-   #define LZHAM_SYMBOL_CODEC_DECODE_ADAPTIVE_HUFFMAN(codec, result, model) \
-   { \
-      const prefix_coding::decoder_tables* pTables = model.m_pDecode_tables; \
-      while (bit_count < (symbol_codec::cBitBufSize - 8)) \
-      { \
-         uint c = 0; \
-         if (pDecode_buf_next == codec.m_pDecode_buf_end) \
-         { \
-            LZHAM_SYMBOL_CODEC_DECODE_END(codec) \
-            codec.decode_need_bytes(); \
-            LZHAM_SYMBOL_CODEC_DECODE_BEGIN(codec) \
-            if (pDecode_buf_next < codec.m_pDecode_buf_end) c = *pDecode_buf_next++; \
-         } \
-         else \
-            c = *pDecode_buf_next++; \
-         bit_count += 8; \
+         c = LZHAM_READ_BIG_ENDIAN_UINT32(pDecode_buf_next - sizeof(uint32)); \
+         bit_count += 32; \
          bit_buf |= (static_cast<symbol_codec::bit_buf_t>(c) << (symbol_codec::cBitBufSize - bit_count)); \
       } \
-      uint k = static_cast<uint>((bit_buf >> (symbol_codec::cBitBufSize - 16)) + 1); \
-      uint len; \
-      if (k <= pTables->m_table_max_code) \
+   } \
+   uint k = static_cast<uint>((bit_buf >> (symbol_codec::cBitBufSize - 16)) + 1); \
+   uint len; \
+   if (LZHAM_BUILTIN_EXPECT(k <= pTables->m_table_max_code, 1)) \
+   { \
+      uint32 t = pTables->m_lookup[bit_buf >> (symbol_codec::cBitBufSize - pTables->m_table_bits)]; \
+      result = t & UINT16_MAX; \
+      len = t >> 16; \
+   } \
+   else \
+   { \
+      len = pTables->m_decode_start_code_size; \
+      for ( ; ; ) \
       { \
-         uint32 t = pTables->m_lookup[bit_buf >> (symbol_codec::cBitBufSize - pTables->m_table_bits)]; \
-         result = t & UINT16_MAX; \
-         len = t >> 16; \
+         if (LZHAM_BUILTIN_EXPECT(k <= pTables->m_max_codes[len - 1], 0)) \
+            break; \
+         len++; \
+      } \
+      int val_ptr = pTables->m_val_ptrs[len - 1] + static_cast<int>(bit_buf >> (symbol_codec::cBitBufSize - len)); \
+      if (((uint)val_ptr >= pModel->m_total_syms)) val_ptr = 0; \
+      result = pTables->m_sorted_symbol_order[val_ptr]; \
+   }  \
+   bit_buf <<= len; \
+   bit_count -= len; \
+   uint freq = pModel->m_sym_freq[result]; \
+   freq++; \
+   pModel->m_sym_freq[result] = static_cast<uint16>(freq); \
+   LZHAM_ASSERT(freq <= UINT16_MAX); \
+   if (LZHAM_BUILTIN_EXPECT(--pModel->m_symbols_until_update == 0, 0)) \
+   { \
+      pModel->update(); \
+   } \
+}
+#else
+#define LZHAM_SYMBOL_CODEC_DECODE_ADAPTIVE_HUFFMAN(codec, result, model) \
+{ \
+   quasi_adaptive_huffman_data_model* pModel; const prefix_coding::decoder_tables* pTables; \
+   pModel = &model; pTables = model.m_pDecode_tables; \
+   while (LZHAM_BUILTIN_EXPECT(bit_count < (symbol_codec::cBitBufSize - 8), 1)) \
+   { \
+      uint c; \
+      if (LZHAM_BUILTIN_EXPECT(pDecode_buf_next == codec.m_pDecode_buf_end, 0)) \
+      { \
+         if (LZHAM_BUILTIN_EXPECT(!codec.m_decode_buf_eof, 1)) \
+         { \
+            codec.m_pSaved_huff_model = pModel; \
+            LZHAM_SYMBOL_CODEC_DECODE_END(codec) \
+            LZHAM_DECODE_NEEDS_BYTES \
+            LZHAM_SYMBOL_CODEC_DECODE_BEGIN(codec) \
+            pModel = codec.m_pSaved_huff_model; pTables = pModel->m_pDecode_tables; \
+         } \
+         c = 0; if (LZHAM_BUILTIN_EXPECT(pDecode_buf_next < codec.m_pDecode_buf_end, 1)) c = *pDecode_buf_next++; \
       } \
       else \
+         c = *pDecode_buf_next++; \
+      bit_count += 8; \
+      bit_buf |= (static_cast<symbol_codec::bit_buf_t>(c) << (symbol_codec::cBitBufSize - bit_count)); \
+   } \
+   uint k = static_cast<uint>((bit_buf >> (symbol_codec::cBitBufSize - 16)) + 1); \
+   uint len; \
+   if (LZHAM_BUILTIN_EXPECT(k <= pTables->m_table_max_code, 1)) \
+   { \
+      uint32 t = pTables->m_lookup[bit_buf >> (symbol_codec::cBitBufSize - pTables->m_table_bits)]; \
+      result = t & UINT16_MAX; \
+      len = t >> 16; \
+   } \
+   else \
+   { \
+      len = pTables->m_decode_start_code_size; \
+      for ( ; ; ) \
       { \
-         len = pTables->m_decode_start_code_size; \
-         for ( ; ; ) \
-         { \
-            if (k <= pTables->m_max_codes[len - 1]) \
-               break; \
-            len++; \
-         } \
-         int val_ptr = pTables->m_val_ptrs[len - 1] + static_cast<int>(bit_buf >> (symbol_codec::cBitBufSize - len)); \
-         if (((uint)val_ptr >= model.m_total_syms)) val_ptr = 0; \
-         result = pTables->m_sorted_symbol_order[val_ptr]; \
-      }  \
-      bit_buf <<= len; \
-      bit_count -= len; \
-      uint freq = model.m_sym_freq[result]; \
-      freq++; \
-      model.m_sym_freq[result] = static_cast<uint16>(freq); \
-      if (freq == UINT16_MAX) model.rescale(); \
-      if (--model.m_symbols_until_update == 0) \
-      { \
-         model.update(); \
+         if (LZHAM_BUILTIN_EXPECT(k <= pTables->m_max_codes[len - 1], 0)) \
+            break; \
+         len++; \
       } \
-   }
+      int val_ptr = pTables->m_val_ptrs[len - 1] + static_cast<int>(bit_buf >> (symbol_codec::cBitBufSize - len)); \
+      if (LZHAM_BUILTIN_EXPECT(((uint)val_ptr >= pModel->m_total_syms), 0)) val_ptr = 0; \
+      result = pTables->m_sorted_symbol_order[val_ptr]; \
+   }  \
+   bit_buf <<= len; \
+   bit_count -= len; \
+   uint freq = pModel->m_sym_freq[result]; \
+   freq++; \
+   pModel->m_sym_freq[result] = static_cast<uint16>(freq); \
+   LZHAM_ASSERT(freq <= UINT16_MAX); \
+   if (LZHAM_BUILTIN_EXPECT(--pModel->m_symbols_until_update == 0, 0)) \
+   { \
+      pModel->update(); \
+   } \
+}
 #endif
 
-#else
-   #define LZHAM_SYMBOL_CODEC_DECODE_DECLARE(codec)
-   #define LZHAM_SYMBOL_CODEC_DECODE_BEGIN(codec)
-   #define LZHAM_SYMBOL_CODEC_DECODE_END(codec)
+#define LZHAM_SYMBOL_CODEC_DECODE_ALIGN_TO_BYTE(codec) if (bit_count & 7) { int dummy_result; LZHAM_SYMBOL_CODEC_DECODE_GET_BITS(codec, dummy_result, bit_count & 7); }
 
-   #define LZHAM_SYMBOL_CODEC_DECODE_GET_BITS(codec, result, num_bits) result = codec.decode_bits(num_bits);
-   #define LZHAM_SYMBOL_CODEC_DECODE_ARITH_BIT(codec, result, model) result = codec.decode(model);
-   #define LZHAM_SYMBOL_CODEC_DECODE_ADAPTIVE_HUFFMAN(codec, result, model) result = codec.decode(model);
-#endif
+#define LZHAM_SYMBOL_CODEC_DECODE_REMOVE_BYTE_FROM_BIT_BUF(codec, result) \
+{ \
+   result = -1; \
+   if (bit_count >= 8) \
+   { \
+      result = static_cast<int>(bit_buf >> (symbol_codec::cBitBufSize - 8)); \
+      bit_buf <<= 8; \
+      bit_count -= 8; \
+   } \
+}
+
+#define LZHAM_SYMBOL_CODEC_DECODE_ARITH_START0(codec) arith_length = cSymbolCodecArithMaxLen; arith_value = 0; { uint val; LZHAM_SYMBOL_CODEC_DECODE_GET_BITS(codec, val, 8); arith_value = val << 24; }
+#define LZHAM_SYMBOL_CODEC_DECODE_ARITH_START1(codec) { uint val; LZHAM_SYMBOL_CODEC_DECODE_GET_BITS(codec, val, 8); arith_value |= (val << 16); }
+#define LZHAM_SYMBOL_CODEC_DECODE_ARITH_START2(codec) { uint val; LZHAM_SYMBOL_CODEC_DECODE_GET_BITS(codec, val, 8); arith_value |= (val << 8); }
+#define LZHAM_SYMBOL_CODEC_DECODE_ARITH_START3(codec) { uint val; LZHAM_SYMBOL_CODEC_DECODE_GET_BITS(codec, val, 8); arith_value |= val; }
 
 } // namespace lzham
 

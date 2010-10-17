@@ -343,6 +343,10 @@
 				RelativePath=".\lzham_api.cpp"
 				>
 			</File>
+			<File
+				RelativePath=".\lzham_dll_main.cpp"
+				>
+			</File>
 		</Filter>
 		<Filter
 			Name="Header Files"
@@ -364,7 +368,15 @@
 				>
 			</File>
 			<File
+				RelativePath="..\include\lzham_dynamic_lib.h"
+				>
+			</File>
+			<File
 				RelativePath="..\include\lzham_exports.inc"
+				>
+			</File>
+			<File
+				RelativePath="..\include\lzham_static_lib.h"
 				>
 			</File>
 		</Filter>
