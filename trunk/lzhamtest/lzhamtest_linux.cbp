@@ -31,7 +31,7 @@
 				<Option compiler="gcc" />
 				<Option parameters="-v a /media/Green/lzham/corpus" />
 				<Compiler>
-					<Add option="-march=pentium-m" />
+					<Add option="-march=core2" />
 					<Add option="-fomit-frame-pointer" />
 					<Add option="-fexpensive-optimizations" />
 					<Add option="-O3" />
