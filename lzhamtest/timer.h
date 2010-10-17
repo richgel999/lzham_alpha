@@ -1,4 +1,4 @@
-// File: win32_timer.h
+// File: timer.h
 //
 // Copyright (c) 2009-2010 Richard Geldreich, Jr. <richgel99@gmail.com>
 //
@@ -22,35 +22,39 @@
 #pragma once
 
 typedef unsigned long long timer_ticks;
-   
-class win32_timer
+
+class timer
 {
 public:
-   win32_timer();
-   win32_timer(timer_ticks start_ticks);
-   
+   timer();
+   timer(timer_ticks start_ticks);
+
    void start();
    void start(timer_ticks start_ticks);
-   
+
    void stop();
-      
+
    double get_elapsed_secs() const;
    inline double get_elapsed_ms() const { return get_elapsed_secs() * 1000.0f; }
-   unsigned long long get_elapsed_us() const;
-   
+   timer_ticks get_elapsed_us() const;
+
    static void init();
+   static inline timer_ticks get_ticks_per_sec() { return g_freq; }
    static timer_ticks get_init_ticks();
    static timer_ticks get_ticks();
    static double ticks_to_secs(timer_ticks ticks);
-          
+   static inline double ticks_to_ms(timer_ticks ticks) { return ticks_to_secs(ticks) * 1000.0f; }
+   static inline double get_secs() { return ticks_to_secs(get_ticks()); }
+   static inline double get_ms() { return ticks_to_ms(get_ticks()); }
+
 private:
-   static unsigned long long g_init_ticks;
-   static unsigned long long g_freq;
+   static timer_ticks g_init_ticks;
+   static timer_ticks g_freq;
    static double g_inv_freq;
-   
-   unsigned long long m_start_time;
-   unsigned long long m_stop_time;
-   
+
+   timer_ticks m_start_time;
+   timer_ticks m_stop_time;
+
    bool m_started : 1;
    bool m_stopped : 1;
 };

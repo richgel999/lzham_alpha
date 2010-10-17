@@ -24,13 +24,64 @@
 
 using namespace lzham;
 
+#define LZHAM_MEM_STATS 0
+
+#ifndef LZHAM_USE_WIN32_API
+   #define _msize malloc_usable_size
+#endif
+
 namespace lzham
 {
-#ifdef LZHAM_PLATFORM_PC_X64
-   const uint64 MAX_POSSIBLE_BLOCK_SIZE = 0x400000000ULL;
-#else
-   const uint32 MAX_POSSIBLE_BLOCK_SIZE = 0x7FFF0000U;
-#endif
+   #if LZHAM_64BIT_POINTERS
+      const uint64 MAX_POSSIBLE_BLOCK_SIZE = 0x400000000ULL;
+   #else
+      const uint32 MAX_POSSIBLE_BLOCK_SIZE = 0x7FFF0000U;
+   #endif
+
+   #if LZHAM_MEM_STATS
+      #if LZHAM_64BIT_POINTERS
+         typedef atomic64_t mem_stat_t;
+         #define LZHAM_MEM_COMPARE_EXCHANGE atomic_compare_exchange64
+      #else
+         typedef atomic32_t mem_stat_t;
+         #define LZHAM_MEM_COMPARE_EXCHANGE atomic_compare_exchange32
+      #endif
+
+      static volatile atomic32_t g_total_blocks;
+      static volatile mem_stat_t g_total_allocated;
+      static volatile mem_stat_t g_max_allocated;
+
+      static mem_stat_t update_total_allocated(int block_delta, mem_stat_t byte_delta)
+      {
+         atomic32_t cur_total_blocks;
+         for ( ; ; )
+         {
+            cur_total_blocks = g_total_blocks;
+            atomic32_t new_total_blocks = static_cast<atomic32_t>(cur_total_blocks + block_delta);
+            LZHAM_ASSERT(new_total_blocks >= 0);
+            if (atomic_compare_exchange32(&g_total_blocks, new_total_blocks, cur_total_blocks) == cur_total_blocks)
+               break;
+         }
+
+         mem_stat_t cur_total_allocated, new_total_allocated;
+         for ( ; ; )
+         {
+            cur_total_allocated = g_total_allocated;
+            new_total_allocated = static_cast<mem_stat_t>(cur_total_allocated + byte_delta);
+            LZHAM_ASSERT(new_total_allocated >= 0);
+            if (LZHAM_MEM_COMPARE_EXCHANGE(&g_total_allocated, new_total_allocated, cur_total_allocated) == cur_total_allocated)
+               break;
+         }
+         for ( ; ; )
+         {
+            mem_stat_t cur_max_allocated = g_max_allocated;
+            mem_stat_t new_max_allocated = LZHAM_MAX(new_total_allocated, cur_max_allocated);
+            if (LZHAM_MEM_COMPARE_EXCHANGE(&g_max_allocated, new_max_allocated, cur_max_allocated) == cur_max_allocated)
+               break;
+         }
+         return new_total_allocated;
+      }
+   #endif // LZHAM_MEM_STATS
 
    static void* lzham_default_realloc(void* p, size_t size, size_t* pActual_size, bool movable, void* pUser_data)
    {
@@ -57,7 +108,12 @@ namespace lzham
       else
       {
          void* p_final_block = p;
+#ifdef WIN32
          p_new = _expand(p, size);
+#else
+
+         p_new = NULL;
+#endif
 
          if (p_new)
          {
@@ -123,6 +179,10 @@ namespace lzham
 
       LZHAM_ASSERT((reinterpret_cast<ptr_bits_t>(p_new) & (LZHAM_MIN_ALLOC_ALIGNMENT - 1)) == 0);
 
+#if LZHAM_MEM_STATS
+      update_total_allocated(1, static_cast<mem_stat_t>(actual_size));
+#endif
+
       return p_new;
    }
 
@@ -140,6 +200,10 @@ namespace lzham
          return NULL;
       }
 
+#if LZHAM_MEM_STATS
+      size_t cur_size = p ? (*g_pMSize)(p, g_pUser_data) : 0;
+#endif
+
       size_t actual_size = size;
       void* p_new = (*g_pRealloc)(p, size, &actual_size, movable, g_pUser_data);
 
@@ -147,6 +211,20 @@ namespace lzham
          *pActual_size = actual_size;
 
       LZHAM_ASSERT((reinterpret_cast<ptr_bits_t>(p_new) & (LZHAM_MIN_ALLOC_ALIGNMENT - 1)) == 0);
+
+#if LZHAM_MEM_STATS
+      int num_new_blocks = 0;
+      if (p)
+      {
+         if (!p_new)
+            num_new_blocks = -1;
+      }
+      else if (p_new)
+      {
+         num_new_blocks = 1;
+      }
+      update_total_allocated(num_new_blocks, static_cast<mem_stat_t>(actual_size) - static_cast<mem_stat_t>(cur_size));
+#endif
 
       return p_new;
    }
@@ -161,6 +239,11 @@ namespace lzham
          lzham_mem_error("lzham_free: bad ptr");
          return;
       }
+
+#if LZHAM_MEM_STATS
+      size_t cur_size = (*g_pMSize)(p, g_pUser_data);
+      update_total_allocated(-1, -static_cast<mem_stat_t>(cur_size));
+#endif
 
       (*g_pRealloc)(p, 0, NULL, true, g_pUser_data);
    }
@@ -193,6 +276,13 @@ namespace lzham
          g_pMSize = pMSize;
          g_pUser_data = pUser_data;
       }
+   }
+
+   void lzham_print_mem_stats()
+   {
+#if LZHAM_MEM_STATS
+      printf("Current blocks: %u, allocated: %I64u, max ever allocated: %I64i\n", g_total_blocks, (int64)g_total_allocated, (int64)g_max_allocated);
+#endif
    }
 
 } // namespace lzham

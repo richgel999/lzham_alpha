@@ -116,7 +116,14 @@ namespace lzham
             lzham_delete(pState);
             return NULL;
          }
-         params.m_pTask_pool = &pState->m_tp;
+         if (pState->m_tp.get_num_threads() >= params.m_max_helper_threads)
+         {
+            params.m_pTask_pool = &pState->m_tp;
+         }
+         else
+         {
+            params.m_max_helper_threads = 0;
+         }
       }
                   
       if (!pState->m_compressor.init(params))

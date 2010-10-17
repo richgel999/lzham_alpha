@@ -45,14 +45,12 @@ namespace lzham
          for (uint i = 0; i < num_syms; i++)
          {
             uint c = pCodesizes[i];
-            if (c)
-            {
-               LZHAM_ASSERT(c <= cMaxEverCodeSize);
-               
-               num_codes[c]++;
-               if (c > max_code_size)
-                  should_limit = true;
-            }
+            
+            LZHAM_ASSERT(c <= cMaxEverCodeSize);
+            
+            num_codes[c]++;
+            if (c > max_code_size)
+               should_limit = true;
          }
          
          if (!should_limit)
@@ -138,11 +136,8 @@ namespace lzham
          for (uint i = 0; i < num_syms; i++)
          {
             uint c = pCodesizes[i];
-            if (c)
-            {
-               LZHAM_ASSERT(c <= cMaxExpectedCodeSize);
-               num_codes[c]++;
-            }
+            LZHAM_ASSERT(c <= cMaxExpectedCodeSize);
+            num_codes[c]++;
          }
 
          uint code = 0;
@@ -171,14 +166,13 @@ namespace lzham
          for (uint i = 0; i < num_syms; i++)
          {
             uint c = pCodesizes[i];
-            if (c)
-            {
-               LZHAM_ASSERT(next_code[c] <= UINT16_MAX);
-               pCodes[i] = static_cast<uint16>(next_code[c]++);
-               
-               LZHAM_ASSERT(math::total_bits(pCodes[i]) <= pCodesizes[i]);
-            }
-         }  
+            
+            LZHAM_ASSERT(!c || (next_code[c] <= UINT16_MAX));
+            
+            pCodes[i] = static_cast<uint16>(next_code[c]++);
+            
+            LZHAM_ASSERT(!c || (math::total_bits(pCodes[i]) <= pCodesizes[i]));
+         }
          
          return true;
       }
@@ -198,8 +192,7 @@ namespace lzham
          for (uint i = 0; i < num_syms; i++)
          {
             uint c = pCodesizes[i];
-            if (c)
-               num_codes[c]++;
+            num_codes[c]++;
          }
 
          uint sorted_positions[cMaxExpectedCodeSize + 1];
@@ -370,7 +363,6 @@ namespace lzham
       }
                
    } // namespace prefix_codig
-
 
 } // namespace lzham
 

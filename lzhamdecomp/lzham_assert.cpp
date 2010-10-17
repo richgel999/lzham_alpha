@@ -33,15 +33,11 @@ void lzham_assert(const char* pExp, const char* pFile, unsigned line)
 {
    char buf[512];
 
-#if defined(WIN32) || defined(_XBOX)
    sprintf_s(buf, sizeof(buf), "%s(%u): Assertion failed: \"%s\"\n", pFile, line, pExp);
-#else
-   sprintf(buf, "%s(%u): Assertion failed: \"%s\"\n", pFile, line, pExp);
-#endif
 
    lzham_output_debug_string(buf);
 
-   printf(buf);
+   printf("%s", buf);
 
    if (lzham_is_debugger_present())
       lzham_debug_break();
@@ -51,44 +47,39 @@ void lzham_fail(const char* pExp, const char* pFile, unsigned line)
 {
    char buf[512];
 
-#if defined(WIN32) || defined(_XBOX)
    sprintf_s(buf, sizeof(buf), "%s(%u): Failure: \"%s\"\n", pFile, line, pExp);
-#else
-   sprintf(buf, "%s(%u): Failure: \"%s\"\n", pFile, line, pExp);
-#endif
 
    lzham_output_debug_string(buf);
 
-   printf(buf);
+   printf("%s", buf);
 
    if (lzham_is_debugger_present())
       lzham_debug_break();
 
+#if LZHAM_USE_WIN32_API
    if (g_fail_exceptions)
       RaiseException(LZHAM_FAIL_EXCEPTION_CODE, 0, 0, NULL);
-   else if (g_exit_on_failure)
+   else
+#endif
+   if (g_exit_on_failure)
       exit(EXIT_FAILURE);
 }
 
-void trace(const char* pFmt, va_list args)
+void lzham_trace(const char* pFmt, va_list args)
 {
    if (lzham_is_debugger_present())
    {
       char buf[512];
-#ifdef _MSC_VER
       vsprintf_s(buf, sizeof(buf), pFmt, args);
-#else
-      vsprintf(buf, pFmt, args);
-#endif
 
       lzham_output_debug_string(buf);
    }
 };
 
-void trace(const char* pFmt, ...)
+void lzham_trace(const char* pFmt, ...)
 {
    va_list args;
    va_start(args, pFmt);
-   trace(pFmt, args);
+   lzham_trace(pFmt, args);
    va_end(args);
 };

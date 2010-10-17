@@ -22,33 +22,11 @@
 #include "lzham_core.h"
 #include "lzham_timer.h"
 
-#ifdef LZHAM_PLATFORM_X360
+#if LZHAM_PLATFORM_X360
 #include <xbdm.h>
 #endif
 
-//#define _WIN32_WINNT 0x500
-//#include "windows.h"
-
-bool lzham_is_debugger_present(void)
-{
-#ifdef LZHAM_PLATFORM_X360
-   return DmIsDebuggerPresent() != 0;
-#else
-   return IsDebuggerPresent() != 0;
-#endif
-}
-
-void lzham_debug_break(void)
-{
-   DebugBreak();
-}
-
-void lzham_output_debug_string(const char* p)
-{
-   OutputDebugStringA(p);
-}
-
-#ifdef __GNUC__
+#ifndef _MSC_VER
 int sprintf_s(char *buffer, size_t sizeOfBuffer, const char *format, ...)
 {
    if (!sizeOfBuffer)
@@ -70,7 +48,7 @@ int vsprintf_s(char *buffer, size_t sizeOfBuffer, const char *format, va_list ar
 {
    if (!sizeOfBuffer)
       return 0;
-   
+
    int c = vsnprintf(buffer, sizeOfBuffer, format, args);
 
    buffer[sizeOfBuffer - 1] = '\0';
@@ -80,10 +58,36 @@ int vsprintf_s(char *buffer, size_t sizeOfBuffer, const char *format, va_list ar
 
    return LZHAM_MIN(c, (int)sizeOfBuffer - 1);
 }
+#endif // __GNUC__
+
+bool lzham_is_debugger_present(void)
+{
+#if LZHAM_PLATFORM_X360
+   return DmIsDebuggerPresent() != 0;
+#elif LZHAM_USE_WIN32_API
+   return IsDebuggerPresent() != 0;
+#else
+   return false;   
 #endif
+}
+
+void lzham_debug_break(void)
+{
+#if LZHAM_USE_WIN32_API
+   DebugBreak();
+#endif   
+}
+
+void lzham_output_debug_string(const char* p)
+{
+   p;
+#if LZHAM_USE_WIN32_API
+   OutputDebugStringA(p);
+#endif   
+}
 
 #if LZHAM_BUFFERED_PRINTF
-
+// This stuff was a quick hack only intended for debugging/development.
 namespace lzham
 {
    struct buffered_str
@@ -97,7 +101,7 @@ namespace lzham
    
    static void lock_buffered_strings()
    {
-      while (InterlockedExchange(&g_buffered_string_locked, 1) == 1)
+      while (atomic_exchange32(&g_buffered_string_locked, 1) == 1)
       {
          lzham_yield_processor();
          lzham_yield_processor();
@@ -112,7 +116,7 @@ namespace lzham
    {
       LZHAM_MEMORY_EXPORT_BARRIER
 
-      InterlockedExchange(&g_buffered_string_locked, 0);
+      atomic_exchange32(&g_buffered_string_locked, 0);
    }
 
 } // namespace lzham

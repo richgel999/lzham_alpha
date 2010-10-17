@@ -184,11 +184,11 @@
 				>
 			</File>
 			<File
-				RelativePath=".\win32_timer.cpp"
+				RelativePath=".\timer.cpp"
 				>
 			</File>
 			<File
-				RelativePath=".\win32_timer.h"
+				RelativePath=".\timer.h"
 				>
 			</File>
 		</Filter>

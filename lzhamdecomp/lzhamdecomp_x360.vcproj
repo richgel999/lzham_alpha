@@ -166,11 +166,11 @@
 				>
 			</File>
 			<File
-				RelativePath=".\lzham_lzbase.cpp"
+				RelativePath=".\lzham_lzdecomp.cpp"
 				>
 			</File>
 			<File
-				RelativePath=".\lzham_lzdecomp.cpp"
+				RelativePath=".\lzham_lzdecompbase.cpp"
 				>
 			</File>
 			<File
@@ -191,6 +191,10 @@
 			</File>
 			<File
 				RelativePath=".\lzham_symbol_codec.cpp"
+				>
+			</File>
+			<File
+				RelativePath=".\lzham_timer.cpp"
 				>
 			</File>
 			<File
@@ -232,7 +236,7 @@
 				>
 			</File>
 			<File
-				RelativePath=".\lzham_lzbase.h"
+				RelativePath=".\lzham_lzdecompbase.h"
 				>
 			</File>
 			<File
@@ -257,6 +261,10 @@
 			</File>
 			<File
 				RelativePath=".\lzham_symbol_codec.h"
+				>
+			</File>
+			<File
+				RelativePath=".\lzham_timer.h"
 				>
 			</File>
 			<File
@@ -290,7 +298,15 @@
 				>
 			</File>
 			<File
+				RelativePath="..\include\lzham_dynamic_lib.h"
+				>
+			</File>
+			<File
 				RelativePath="..\include\lzham_exports.inc"
+				>
+			</File>
+			<File
+				RelativePath="..\include\lzham_static_lib.h"
 				>
 			</File>
 		</Filter>

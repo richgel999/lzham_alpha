@@ -22,7 +22,6 @@
 #pragma once
 #include "lzham_match_accel.h"
 #include "lzham_symbol_codec.h"
-#include "lzham_task_pool.h"
 #include "lzham_lzbase.h"
 
 namespace lzham
@@ -30,7 +29,7 @@ namespace lzham
    typedef lzham::vector<uint8> byte_vec;
 
    const uint cMaxParseGraphNodes = 3072;
-   const uint cMaxParseThreads = 4;
+   const uint cMaxParseThreads = 8;
 
    enum compression_level
    {
@@ -109,11 +108,12 @@ namespace lzham
       {
          cLitComplexity = 1,
          cRep0Complexity = 2,
+         cRep3Complexity = 5,
          
-         cLongMatchComplexity = 5,
+         cLongMatchComplexity = 6,
          cLongMatchComplexityLenThresh = 9,
          
-         cShortMatchComplexity = 6
+         cShortMatchComplexity = 7
       };
 
       struct lzdecision
@@ -144,7 +144,7 @@ namespace lzham
             else if (is_rep())
             {
                LZHAM_ASSUME(cRep0Complexity == 2);
-               return 1 + -m_dist;  // 2, 3, 4
+               return 1 + -m_dist;  // 2, 3, 4, or 5
             }
             else if (get_len() >= cLongMatchComplexityLenThresh)
                return cLongMatchComplexity;
@@ -161,13 +161,13 @@ namespace lzham
          }
       };
       
-      struct saved_state
+      struct state_base
       {
          uint m_cur_ofs;
          uint m_cur_state;
          uint m_match_hist[CLZBase::cMatchHistSize];
-
-         inline bool operator== (const saved_state &rhs) const
+         
+         inline bool operator== (const state_base &rhs) const
          {
             if (m_cur_state != rhs.m_cur_state)
                return false;
@@ -179,14 +179,14 @@ namespace lzham
 
          void partial_advance(const lzdecision& lzdec);
          
-         inline void save_partial_state(saved_state& dst)
+         inline void save_partial_state(state_base& dst)
          {
             dst.m_cur_ofs = m_cur_ofs;
             dst.m_cur_state = m_cur_state;
             memcpy(dst.m_match_hist, m_match_hist, sizeof(m_match_hist));
          }
 
-         inline void restore_partial_state(const saved_state& src)
+         inline void restore_partial_state(const state_base& src)
          {
             m_cur_ofs = src.m_cur_ofs;
             m_cur_state = src.m_cur_state;
@@ -194,7 +194,7 @@ namespace lzham
          }
       };
 
-      class state : public saved_state
+      class state : public state_base
       {
       public:
          state();
@@ -203,17 +203,18 @@ namespace lzham
 
          bool init(CLZBase& lzbase, bool fast_adaptive_huffman_updating, bool use_polar_codes);
 
-         float get_len2_match_cost(CLZBase& lzbase, uint len2_match_dist, uint is_match_model_index);
          float get_cost(CLZBase& lzbase, const search_accelerator& dict, const lzdecision& lzdec) const;
+         float get_len2_match_cost(CLZBase& lzbase, uint dict_pos, uint len2_match_dist, uint is_match_model_index);
          float get_lit_cost(const search_accelerator& dict, uint dict_pos, uint lit_pred0, uint is_match_model_index) const;
 
          // Returns actual cost.
-         void get_rep_match_costs(float *pBitcosts, uint match_hist_index, int min_len, int max_len, uint is_match_model_index) const;
-         void get_full_match_costs(CLZBase& lzbase, float *pBitcosts, uint match_dist, int min_len, int max_len, uint is_match_model_index) const;
+         void get_rep_match_costs(uint dict_pos, float *pBitcosts, uint match_hist_index, int min_len, int max_len, uint is_match_model_index) const;
+         void get_full_match_costs(CLZBase& lzbase, uint dict_pos, float *pBitcosts, uint match_dist, int min_len, int max_len, uint is_match_model_index) const;
 
          float update_stats(CLZBase& lzbase, const search_accelerator& dict, const lzdecision& lzdec);
 
          bool encode(symbol_codec& codec, CLZBase& lzbase, const search_accelerator& dict, const lzdecision& lzdec);
+         void print(symbol_codec& codec, CLZBase& lzbase, const search_accelerator& dict, const lzdecision& lzdec);
          bool encode_eob(symbol_codec& codec, const search_accelerator& dict);
          bool encode_reset_state_partial(symbol_codec& codec, const search_accelerator& dict);
 
@@ -221,7 +222,7 @@ namespace lzham
          int find_match_dist(uint match_hist) const;
 
          void reset_state_partial();
-         void start_of_block(const search_accelerator& dict, uint cur_ofs);
+         void start_of_block(const search_accelerator& dict, uint cur_ofs, uint block_index);
 
          uint get_pred_char(const search_accelerator& dict, int pos, int backward_ofs) const;
 
@@ -230,15 +231,17 @@ namespace lzham
             return (!lzdec.is_match()) &&  (m_cur_state >= CLZBase::cNumLitStates);
          }
          
-         uint m_block_ofs;
+         uint m_block_start_dict_ofs;
 
-         adaptive_bit_model m_is_match_model[(1 << CLZBase::cNumIsMatchContextBits) * 16];//CLZBase::cNumStates];
+         adaptive_bit_model m_is_match_model[CLZBase::cNumStates * (1 << CLZBase::cNumIsMatchContextBits)];
 
          adaptive_bit_model m_is_rep_model[CLZBase::cNumStates];
          adaptive_bit_model m_is_rep0_model[CLZBase::cNumStates];
          adaptive_bit_model m_is_rep0_single_byte_model[CLZBase::cNumStates];
          adaptive_bit_model m_is_rep1_model[CLZBase::cNumStates];
-
+         adaptive_bit_model m_is_rep2_model[CLZBase::cNumStates];
+        
+        
          typedef quasi_adaptive_huffman_data_model sym_data_model;
          sym_data_model m_lit_table[1 << CLZBase::cNumLitPredBits];
          sym_data_model m_delta_lit_table[1 << CLZBase::cNumDeltaLitPredBits];
@@ -264,11 +267,22 @@ namespace lzham
 
          double m_total_match_bits_cost;
          double m_worst_match_bits_cost;
-         double m_total_match0_bits_cost;
-         double m_total_match1_bits_cost;
+         double m_total_is_match0_bits_cost;
+         double m_total_is_match1_bits_cost;
+         
+         uint m_total_truncated_matches;
+         uint m_match_truncation_len_hist[CLZBase::cMaxMatchLen + 1];
+         uint m_match_truncation_hist[CLZBase::cMaxMatchLen + 1];
+         uint m_match_type_truncation_hist[CLZBase::cNumStates][5];
+         uint m_match_type_was_not_truncated_hist[CLZBase::cNumStates][5];
+         
+         uint m_total_is_rep0;
+         uint m_total_is_rep0_len1;
+         uint m_total_is_rep1;
+         uint m_total_is_rep2;
          uint m_total_nonmatches;
          uint m_total_matches;
-
+         
          uint m_total_lits;
          double m_total_lit_cost;
          double m_worst_lit_cost;
@@ -311,7 +325,7 @@ namespace lzham
 
       uint m_step;
 
-      uint m_start_dict_ofs;
+      uint m_block_start_dict_ofs;
 
       uint m_block_index;
 
@@ -330,7 +344,7 @@ namespace lzham
          lzdecision m_lzdec;                 
          
          // This is either the state of the parent node (optimal parsing), or the state of the child node (extreme parsing).
-         state::saved_state m_saved_state;     
+         state::state_base m_saved_state;     
          
          // Total cost to arrive at this node state.
          float m_total_cost;                 
@@ -386,7 +400,7 @@ namespace lzham
       uint m_num_parse_threads;
       parse_thread_state m_parse_thread_state[cMaxParseThreads];
 
-      volatile LONG m_parse_jobs_remaining;
+      volatile atomic32_t m_parse_jobs_remaining;
       semaphore m_parse_jobs_complete;
 
       bool send_final_block();

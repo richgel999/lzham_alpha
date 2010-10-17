@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8" standalone="yes" ?>
+<CodeBlocks_workspace_file>
+	<Workspace title="Workspace">
+		<Project filename="lzhamtest/lzhamtest_linux.cbp" active="1">
+			<Depends filename="lzhamcomp/lzhamcomp_linux.cbp" />
+			<Depends filename="lzhamdecomp/lzhamdecomp_linux.cbp" />
+		</Project>
+		<Project filename="lzhamcomp/lzhamcomp_linux.cbp" />
+		<Project filename="lzhamdecomp/lzhamdecomp_linux.cbp" />
+	</Workspace>
+</CodeBlocks_workspace_file>

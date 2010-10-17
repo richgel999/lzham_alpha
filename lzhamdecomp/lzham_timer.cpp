@@ -22,12 +22,36 @@
 #include "lzham_core.h"
 #include "lzham_timer.h"
 
+#ifndef LZHAM_USE_WIN32_API
+   #include <time.h>
+#endif   
+
 namespace lzham
 {
    unsigned long long lzham_timer::g_init_ticks;
    unsigned long long lzham_timer::g_freq;
    double lzham_timer::g_inv_freq;
-
+   
+   #if LZHAM_USE_WIN32_API
+      inline void query_counter(timer_ticks *pTicks)
+      {
+         QueryPerformanceCounter(reinterpret_cast<LARGE_INTEGER*>(pTicks));
+      }
+      inline void query_counter_frequency(timer_ticks *pTicks)
+      {
+         QueryPerformanceFrequency(reinterpret_cast<LARGE_INTEGER*>(pTicks));
+      }
+   #else
+      inline void query_counter(timer_ticks *pTicks)
+      {
+         *pTicks = clock();
+      }
+      inline void query_counter_frequency(timer_ticks *pTicks)
+      {
+         *pTicks = CLOCKS_PER_SEC;
+      }
+   #endif
+   
    lzham_timer::lzham_timer() :
       m_start_time(0),
       m_stop_time(0),
@@ -59,7 +83,7 @@ namespace lzham
 
    void lzham_timer::start()
    {
-      QueryPerformanceCounter((LARGE_INTEGER*)&m_start_time);
+      query_counter(&m_start_time);
       
       m_started = true;
       m_stopped = false;
@@ -69,7 +93,7 @@ namespace lzham
    {
       LZHAM_ASSERT(m_started);
                   
-      QueryPerformanceCounter((LARGE_INTEGER*)&m_stop_time);
+      query_counter(&m_stop_time);
       
       m_stopped = true;
    }
@@ -82,7 +106,7 @@ namespace lzham
       
       timer_ticks stop_time = m_stop_time;
       if (!m_stopped)
-         QueryPerformanceCounter((LARGE_INTEGER*)&stop_time);
+         query_counter(&stop_time);
          
       timer_ticks delta = stop_time - m_start_time;
       return delta * g_inv_freq;
@@ -96,7 +120,7 @@ namespace lzham
          
       timer_ticks stop_time = m_stop_time;
       if (!m_stopped)
-         QueryPerformanceCounter((LARGE_INTEGER*)&stop_time);
+         query_counter(&stop_time);
       
       timer_ticks delta = stop_time - m_start_time;
       return (delta * 1000000ULL + (g_freq >> 1U)) / g_freq;      
@@ -106,10 +130,10 @@ namespace lzham
    {
       if (!g_inv_freq)
       {
-         QueryPerformanceFrequency((LARGE_INTEGER*)&g_freq);
+         query_counter_frequency(&g_freq);
          g_inv_freq = 1.0f / g_freq;
          
-         QueryPerformanceCounter((LARGE_INTEGER*)&g_init_ticks);
+         query_counter(&g_init_ticks);
       }
    }
 
@@ -127,7 +151,7 @@ namespace lzham
          init();
       
       timer_ticks ticks;
-      QueryPerformanceCounter((LARGE_INTEGER*)&ticks);
+      query_counter(&ticks);
       return ticks - g_init_ticks;
    }
 
@@ -138,4 +162,5 @@ namespace lzham
       
       return ticks * g_inv_freq;
    }
+   
 } // namespace lzham

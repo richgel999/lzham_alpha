@@ -27,9 +27,12 @@ namespace lzham
    bool elemental_vector::increase_capacity(uint min_new_capacity, bool grow_hint, uint element_size, object_mover pMover, bool nofail)
    {
       LZHAM_ASSERT(m_size <= m_capacity);
-#ifdef LZHAM_PLATFORM_PC_X64
+      
+#if LZHAM_64BIT_POINTERS
+      LZHAM_ASSUME(sizeof(void*) == sizeof(uint64));
       LZHAM_ASSERT(min_new_capacity < (0x400000000ULL / element_size));
 #else      
+      LZHAM_ASSUME(sizeof(void*) == sizeof(uint32));
       LZHAM_ASSERT(min_new_capacity < (0x7FFF0000U / element_size));
 #endif      
 

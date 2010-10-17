@@ -50,7 +50,8 @@ namespace lzham
       m_max_probes(0),
       m_max_matches(0),
       m_all_matches(false),
-      m_next_match_ref(0)
+      m_next_match_ref(0),
+      m_num_completed_helper_threads(0)
    {
    }
 
@@ -76,6 +77,7 @@ namespace lzham
       m_fill_lookahead_pos = 0;
       m_fill_lookahead_size = 0;
       m_fill_dict_size = 0;
+      m_num_completed_helper_threads = 0;
 
       if (!m_dict.try_resize_no_construct(max_dict_size + CLZBase::cMaxMatchLen))
          return false;
@@ -190,7 +192,7 @@ namespace lzham
             uint match_len = 0;
             const uint8* pComp = &pDict[pos];
 
-#ifdef PLATFORM_X360
+#if LZHAM_PLATFORM_X360
             for ( ; match_len < max_match_len; match_len++)
                if (pComp[match_len] != pIns[match_len])
                   break;
@@ -304,7 +306,7 @@ namespace lzham
 
             const uint num_matches_to_write = LZHAM_MIN(num_matches, m_max_matches);
 
-            const uint match_ref_ofs = InterlockedExchangeAdd(&m_next_match_ref, num_matches_to_write);
+            const uint match_ref_ofs = atomic_exchange_add(&m_next_match_ref, num_matches_to_write);
 
             memcpy(&m_matches[match_ref_ofs],
                    temp_matches + (num_matches - num_matches_to_write),
@@ -313,11 +315,11 @@ namespace lzham
             // FIXME: This is going to really hurt on platforms requiring export barriers.
             LZHAM_MEMORY_EXPORT_BARRIER
 
-            InterlockedExchange((LONG*)&m_match_refs[static_cast<uint>(fill_lookahead_pos - m_fill_lookahead_pos)], match_ref_ofs);
+            atomic_exchange32((atomic32_t*)&m_match_refs[static_cast<uint>(fill_lookahead_pos - m_fill_lookahead_pos)], match_ref_ofs);
          }
          else
          {
-            InterlockedExchange((LONG*)&m_match_refs[static_cast<uint>(fill_lookahead_pos - m_fill_lookahead_pos)], -2);
+            atomic_exchange32((atomic32_t*)&m_match_refs[static_cast<uint>(fill_lookahead_pos - m_fill_lookahead_pos)], -2);
          }
 
          fill_lookahead_pos++;
@@ -331,12 +333,14 @@ namespace lzham
          m_nodes[insert_pos].m_left = 0;
          m_nodes[insert_pos].m_right = 0;
 
-         InterlockedExchange((LONG*)&m_match_refs[static_cast<uint>(fill_lookahead_pos - m_fill_lookahead_pos)], -2);
+         atomic_exchange32((atomic32_t*)&m_match_refs[static_cast<uint>(fill_lookahead_pos - m_fill_lookahead_pos)], -2);
 
          fill_lookahead_pos++;
          fill_lookahead_size--;
          fill_dict_size++;
       }
+      
+      atomic_increment32(&m_num_completed_helper_threads);
    }
 
    bool search_accelerator::find_len2_matches()
@@ -415,6 +419,8 @@ namespace lzham
       if (!m_pTask_pool)
       {
          find_all_matches_callback(0, NULL);
+         
+         m_num_completed_helper_threads = 0;
       }
       else
       {
@@ -452,6 +458,8 @@ namespace lzham
                }
             }
          }
+         
+         m_num_completed_helper_threads = 0;
 
          if (!m_pTask_pool->queue_multiple_object_tasks(this, &search_accelerator::find_all_matches_callback, 0, m_max_helper_threads))
             return false;
@@ -529,7 +537,7 @@ namespace lzham
          {
             spin_count = cMaxSpinCount;
 
-            Sleep(1);
+            lzham_sleep(1);
          }
       }
 

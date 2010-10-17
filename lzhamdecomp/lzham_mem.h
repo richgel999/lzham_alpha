@@ -125,5 +125,7 @@ namespace lzham
          }
       }
    }   
+   
+   void lzham_print_mem_stats();
 
 } // namespace lzham
