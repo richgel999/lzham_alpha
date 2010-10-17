@@ -25,7 +25,6 @@
 					<Add library="user32" />
 					<Add library="..\lzhamdecomp\liblzhamdecomp_x86D.a" />
 					<Add library="..\lzhamcomp\liblzhamcomp_x86D.a" />
-					<Add library="..\ext\libpthread\lib\libpthreadGC2.a" />
 				</Linker>
 			</Target>
 			<Target title="Release x86">
@@ -48,7 +47,6 @@
 					<Add library="user32" />
 					<Add library="..\lzhamcomp\liblzhamcomp_x86.a" />
 					<Add library="..\lzhamdecomp\liblzhamdecomp_x86.a" />
-					<Add library="..\ext\libpthread\lib\libpthreadGC2.a" />
 				</Linker>
 			</Target>
 			<Target title="Debug x64">
@@ -99,8 +97,8 @@
 			<Add directory="..\lzhamdecomp" />
 			<Add directory="..\lzhamcomp" />
 		</Compiler>
-      <Unit filename="lzham_dll_main.cpp" />
 		<Unit filename="lzham_api.cpp" />
+		<Unit filename="lzham_dll_main.cpp" />
 		<Extensions>
 			<code_completion />
 			<debugger />
