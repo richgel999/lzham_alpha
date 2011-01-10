@@ -1,24 +1,5 @@
 // File: lzham_symbol_codec.h
-//
-// Copyright (c) 2009-2010 Richard Geldreich, Jr. <richgel99@gmail.com>
-//
-// Permission is hereby granted, free of charge, to any person obtaining a copy
-// of this software and associated documentation files (the "Software"), to deal
-// in the Software without restriction, including without limitation the rights
-// to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-// copies of the Software, and to permit persons to whom the Software is
-// furnished to do so, subject to the following conditions:
-//
-// The above copyright notice and this permission notice shall be included in
-// all copies or substantial portions of the Software.
-//
-// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-// IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-// FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-// AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-// LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-// OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
-// THE SOFTWARE.
+// See Copyright Notice and license at the end of include/lzham.h
 #pragma once
 #include "lzham_prefix_coding.h"
 
@@ -35,7 +16,12 @@ namespace lzham
    const uint cSymbolCodecArithProbHalfScale = 1 << (cSymbolCodecArithProbBits - 1);
    const uint cSymbolCodecArithProbMoveBits = 5;
 
-   extern float gProbCost[cSymbolCodecArithProbScale];
+   typedef uint64 bit_cost_t;
+   const uint32 cBitCostScaleShift = 24;
+   const uint32 cBitCostScale = (1U << cBitCostScaleShift);
+   const bit_cost_t cBitCostMax = UINT64_MAX;
+
+   extern uint32 gProbCost[cSymbolCodecArithProbScale];
 
    class raw_quasi_adaptive_huffman_data_model
    {
@@ -55,7 +41,7 @@ namespace lzham
       void reset_update_rate();
 
       inline uint get_total_syms() const { return m_total_syms; }
-      inline uint get_cost(uint sym) const { return m_code_sizes[sym]; }
+      inline bit_cost_t get_cost(uint sym) const { return m_code_sizes[sym] << cBitCostScaleShift; }
 
    public:
       lzham::vector<uint16>            m_sym_freq;
@@ -104,7 +90,7 @@ namespace lzham
       void set_probability_0(float prob0);
       void update(uint bit);
 
-      inline float get_cost(uint bit) const { return gProbCost[bit ? (cSymbolCodecArithProbScale - m_bit_0_prob) : m_bit_0_prob]; }
+      inline bit_cost_t get_cost(uint bit) const { return gProbCost[bit ? (cSymbolCodecArithProbScale - m_bit_0_prob) : m_bit_0_prob]; }
 
    public:
       uint16 m_bit_0_prob;
@@ -130,7 +116,7 @@ namespace lzham
       void reset();
 
       uint get_total_syms() const { return m_total_syms; }
-      float get_cost(uint sym) const;
+      bit_cost_t get_cost(uint sym) const;
 
    private:
       uint m_total_syms;

@@ -1,4 +1,5 @@
 // File: lzham_dll_main.cpp
+// See Copyright Notice and license at the end of include/lzham.h
 #include "lzham_core.h"
 
 BOOL APIENTRY DllMain(HANDLE hModule, DWORD fdwReason, LPVOID lpReserved)

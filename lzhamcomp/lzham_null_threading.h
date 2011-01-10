@@ -1,4 +1,5 @@
 // File: lzham_task_pool_null.h
+// See Copyright Notice and license at the end of include/lzham.h
 #pragma once
 
 namespace lzham

@@ -1,24 +1,5 @@
 // File: lzhamtest.cpp
-//
-// Copyright (c) 2009-2010 Richard Geldreich, Jr. <richgel99@gmail.com>
-//
-// Permission is hereby granted, free of charge, to any person obtaining a copy
-// of this software and associated documentation files (the "Software"), to deal
-// in the Software without restriction, including without limitation the rights
-// to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-// copies of the Software, and to permit persons to whom the Software is
-// furnished to do so, subject to the following conditions:
-//
-// The above copyright notice and this permission notice shall be included in
-// all copies or substantial portions of the Software.
-//
-// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-// IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-// FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-// AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-// LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-// OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
-// THE SOFTWARE.
+// See Copyright Notice and license at the end of include/lzham.h
 #if defined(__GNUC__)
 #define _FILE_OFFSET_BITS 64
 #endif
@@ -937,7 +918,7 @@ static bool test_recursive(ilzham &lzham_dll, const char *pPath, comp_options op
 
    const int first_file_index = 0;
 
-   uint unique_id = (uint)timer::get_ms();
+   uint unique_id = static_cast<uint>(timer::get_init_ticks());
    char cmp_file[256], decomp_file[256];
 
 #ifdef _XBOX
@@ -1170,6 +1151,13 @@ int main_internal(string_array cmd_line, int num_helper_threads, ilzham &lzham_d
             case 'e':
             {
                options.m_deterministic_parsing = true;
+               break;
+            }
+            case 's':
+            {
+               int seed = atoi(str.c_str() + 2);
+               srand(seed);
+               printf("Using random seed: %i\n", seed);
                break;
             }
             default:

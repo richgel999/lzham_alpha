@@ -1,24 +1,5 @@
 // File: lzham_math.h
-//
-// Copyright (c) 2009-2010 Richard Geldreich, Jr. <richgel99@gmail.com>
-//
-// Permission is hereby granted, free of charge, to any person obtaining a copy
-// of this software and associated documentation files (the "Software"), to deal
-// in the Software without restriction, including without limitation the rights
-// to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-// copies of the Software, and to permit persons to whom the Software is
-// furnished to do so, subject to the following conditions:
-//
-// The above copyright notice and this permission notice shall be included in
-// all copies or substantial portions of the Software.
-//
-// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-// IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-// FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-// AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-// LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-// OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
-// THE SOFTWARE.
+// See Copyright Notice and license at the end of include/lzham.h
 #pragma once
 
 #if defined(LZHAM_USE_MSVC_INTRINSICS) && !defined(__MINGW32__)
@@ -32,8 +13,6 @@ namespace lzham
 {
    namespace math
    {
-   	const float cNearlyInfinite = 1.0e+37f;
-
       // Yes I know these should probably be pass by ref, not val:
       // http://www.stepanovpapers.com/notes.pdf
       // Just don't use them on non-simple (non built-in) types!
@@ -58,8 +37,8 @@ namespace lzham
          return reinterpret_cast<T>(q);
       }
 
-		// From "Hackers Delight"
-		// val remains unchanged if it is already a power of 2.
+      // From "Hackers Delight"
+      // val remains unchanged if it is already a power of 2.
       inline uint32 next_pow2(uint32 val)
       {
          val--;

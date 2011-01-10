@@ -1,4 +1,5 @@
 // File: lzham_decomp.h
+// See Copyright Notice and license at the end of include/lzham.h
 #pragma once
 #include "lzham.h"
 
