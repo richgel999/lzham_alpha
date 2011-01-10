@@ -1,5 +1,13 @@
-#summary Detailed version history
+#summary Detailed version release history
 #labels Featured
+
+*Alpha6 Changes*
+
+I modified the compressor to use fixed point arithmetic to track bit prices, instead of floating point math. (The compressor should not use floating point math anywhere now.) This ensures the compressor's output doesn't vary between compilers, optimization settings, platforms, etc. The compression ratio has actually improved a tiny amount (by around .05% to .08%) in this release due to this change.
+
+I also removed an unnecessary per-block memcpy() from the compressor for a minor perf. savings.
+
+Alpha6's output should be binary compatible with Alpha5 (and vice versa).
 
 * Alpha5 Changes*
 
