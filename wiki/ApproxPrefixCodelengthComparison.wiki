@@ -1,4 +1,5 @@
 #summary Compares several approximate prefix codelength generation methods
+#labels Featured
 
 == Shannon-Fano, Huffman, Polar, and Fyffe Showdown ==
 
