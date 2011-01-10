@@ -1,5 +1,5 @@
-LZHAM Codec - Alpha5 - Released Oct. 17, 2010
-Copyright (c) 2009-2010 Richard Geldreich, Jr. <richgel99@gmail.com>
+LZHAM Lossless Data Compression Codec - Alpha6 - Released Jan. 9, 2011
+Copyright (c) 2009-2011 Richard Geldreich, Jr. <richgel99@gmail.com>
 MIT License - http://code.google.com/p/lzham/
 
 lzhamtest_x86/x64 is a simple command line test program that uses the LZHAM codec DLL to compress/decompress single files.
@@ -33,10 +33,10 @@ The x86 version defaults to 64MB (26), and the x64 version defaults to 256MB (28
 - Set compression level to uber (the default):
 	lzhamtest_x64 -m4 c source_filename compressed_filename
 	
-- For best compression, use the -x option with -m4, which enables more rigorous (but ~4X slower!) parsing:
-	lzhamtest_x64 -x -m4 c source_filename compressed_filename
+- For best possible compression, use -d29 to enable the largest dictionary size (512MB) and the -x option which enables more rigorous (but ~4X slower!) parsing:
+	lzhamtest_x64 -d29 -x -m4 c source_filename compressed_filename
 
-See lzhamtest_x86/x64.exe's usage text for more command line parameters.
+See lzhamtest_x86/x64.exe's help text for more command line parameters.
 
 -- Compiling LZHAM
 
@@ -53,17 +53,20 @@ LZHAM can be compiled with Visual Studio 2008 (preferred) or with Codeblocks 10.
 http://www.codeblocks.org/
 http://tdm-gcc.tdragon.net/
 
+The Codeblocks workspace is "lzhamtest.workspace". The codec runs a bit slower when compiled with GCC, but the difference is less than 5%.
+
 Visual Studio 2008 solution is "lzham.sln". The codec seems to compile and run fine with Visual Studio 2010 in my limited testing.
 
 The codec compiles for Xbox 360 as well: lzham_x360.sln. Note that I barely spent any time verifying the codec on this platform. 
 I made sure Alpha5 compiles for Xbox 360 but has not been retested in a while. I plan on throughly testing the codec on Xbox 360 when time permits.
 
-The Codeblocks workspace is "lzhamtest.workspace". The codec runs a bit slower when compiled with GCC, but the difference is less than 5%.
-
 - ANSI C/C++
 
-LZHAM Alpha5 also supports plain vanilla ANSI C/C++. To see how the codec configures itself check out lzham_core.h and search for "LZHAM_ANSI_CPLUSPLUS". 
+LZHAM also supports plain vanilla ANSI C/C++. To see how the codec configures itself check out lzham_core.h and search for "LZHAM_ANSI_CPLUSPLUS". 
 All platform specific stuff (unaligned loads, threading, atomic ops, etc.) should be disabled when this macro is defined. Note, the compressor doesn't use threads 
 or atomic operations when built this way so it's going to be pretty slow. (The compressor was built from the ground up to be threaded.)
 
+-- Known Problems
 
+I've only compiled/tested LZHAM using the x64 version of TDM-GCC. Even though the Codeblocks project contains both x86 and x64 projects, I've had a few problems
+compiling LZHAM using the 32-bit (only) version of TDM-GCC. This will be fixed in the next alpha release.

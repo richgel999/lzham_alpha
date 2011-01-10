@@ -29,7 +29,8 @@
 				<Option type="1" />
 				<Option compiler="gcc" />
 				<Compiler>
-					<Add option="-O2" />
+					<Add option="-fomit-frame-pointer" />
+					<Add option="-O3" />
 					<Add option="-m32" />
 					<Add option="-DNDEBUG" />
 				</Compiler>
@@ -57,7 +58,8 @@
 				<Option type="1" />
 				<Option compiler="gcc" />
 				<Compiler>
-					<Add option="-O2" />
+					<Add option="-fomit-frame-pointer" />
+					<Add option="-O3" />
 					<Add option="-DNDEBUG" />
 				</Compiler>
 				<Linker>

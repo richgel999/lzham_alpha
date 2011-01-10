@@ -1,24 +1,5 @@
 // File: lzham_lzcomp_internal.cpp
-//
-// Copyright (c) 2009-2010 Richard Geldreich, Jr. <richgel99@gmail.com>
-//
-// Permission is hereby granted, free of charge, to any person obtaining a copy
-// of this software and associated documentation files (the "Software"), to deal
-// in the Software without restriction, including without limitation the rights
-// to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-// copies of the Software, and to permit persons to whom the Software is
-// furnished to do so, subject to the following conditions:
-//
-// The above copyright notice and this permission notice shall be included in
-// all copies or substantial portions of the Software.
-//
-// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-// IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-// FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-// AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-// LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-// OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
-// THE SOFTWARE.
+// See Copyright Notice and license at the end of include/lzham.h
 #include "lzham_core.h"
 #include "lzham_lzcomp_internal.h"
 #include "lzham_checksum.h"
@@ -235,13 +216,13 @@ namespace lzham
       return dict[pos - backward_ofs];
    }
 
-   float lzcompressor::state::get_cost(CLZBase& lzbase, const search_accelerator& dict, const lzdecision& lzdec) const
+   bit_cost_t lzcompressor::state::get_cost(CLZBase& lzbase, const search_accelerator& dict, const lzdecision& lzdec) const
    {
       const uint lit_pred0 = get_pred_char(dict, lzdec.m_pos, 1);
 
       uint is_match_model_index = LZHAM_COMPUTE_IS_MATCH_MODEL_INDEX(lit_pred0, m_cur_state);
       LZHAM_ASSERT(is_match_model_index < LZHAM_ARRAY_SIZE(m_is_match_model));
-      float cost = m_is_match_model[is_match_model_index].get_cost(lzdec.is_match());
+      bit_cost_t cost = m_is_match_model[is_match_model_index].get_cost(lzdec.is_match());
 
       if (!lzdec.is_match())
       {
@@ -270,7 +251,6 @@ namespace lzham
 
             cost += m_delta_lit_table[lit_pred].get_cost(delta_lit);
          }
-
       }
       else
       {
@@ -360,11 +340,11 @@ namespace lzham
 
             uint num_extra_bits = lzbase.m_lzx_position_extra_bits[match_slot];
             if (num_extra_bits < 3)
-               cost += num_extra_bits;
+               cost += (num_extra_bits << cBitCostScaleShift);
             else
             {
                if (num_extra_bits > 4)
-                  cost += (num_extra_bits - 4);
+                  cost += ((num_extra_bits - 4) << cBitCostScaleShift);
 
                cost += m_dist_lsb_table.get_cost(match_extra & 15);
             }
@@ -374,11 +354,11 @@ namespace lzham
       return cost;
    }
 
-   float lzcompressor::state::get_len2_match_cost(CLZBase& lzbase, uint dict_pos, uint len2_match_dist, uint is_match_model_index)
+   bit_cost_t lzcompressor::state::get_len2_match_cost(CLZBase& lzbase, uint dict_pos, uint len2_match_dist, uint is_match_model_index)
    {
       dict_pos;
 
-      float cost = m_is_match_model[is_match_model_index].get_cost(1);
+      bit_cost_t cost = m_is_match_model[is_match_model_index].get_cost(1);
 
       cost += m_is_rep_model[m_cur_state].get_cost(0);
 
@@ -400,11 +380,11 @@ namespace lzham
 
       uint num_extra_bits = lzbase.m_lzx_position_extra_bits[match_slot];
       if (num_extra_bits < 3)
-         cost += num_extra_bits;
+         cost += (num_extra_bits << cBitCostScaleShift);
       else
       {
          if (num_extra_bits > 4)
-            cost += (num_extra_bits - 4);
+            cost += ((num_extra_bits - 4) << cBitCostScaleShift);
 
          cost += m_dist_lsb_table.get_cost(match_extra & 15);
       }
@@ -412,9 +392,9 @@ namespace lzham
       return cost;
    }
 
-   float lzcompressor::state::get_lit_cost(const search_accelerator& dict, uint dict_pos, uint lit_pred0, uint is_match_model_index) const
+   bit_cost_t lzcompressor::state::get_lit_cost(const search_accelerator& dict, uint dict_pos, uint lit_pred0, uint is_match_model_index) const
    {
-      float cost = m_is_match_model[is_match_model_index].get_cost(0);
+      bit_cost_t cost = m_is_match_model[is_match_model_index].get_cost(0);
 
       const uint lit = dict[dict_pos];
 
@@ -445,13 +425,13 @@ namespace lzham
       return cost;
    }
 
-   void lzcompressor::state::get_rep_match_costs(uint dict_pos, float *pBitcosts, uint match_hist_index, int min_len, int max_len, uint is_match_model_index) const
+   void lzcompressor::state::get_rep_match_costs(uint dict_pos, bit_cost_t *pBitcosts, uint match_hist_index, int min_len, int max_len, uint is_match_model_index) const
    {
       dict_pos;
       // match
       const sym_data_model &rep_len_table = m_rep_len_table[m_cur_state >= CLZBase::cNumLitStates];
 
-      float base_cost = m_is_match_model[is_match_model_index].get_cost(1);
+      bit_cost_t base_cost = m_is_match_model[is_match_model_index].get_cost(1);
 
       base_cost += m_is_rep_model[m_cur_state].get_cost(1);
 
@@ -497,7 +477,7 @@ namespace lzham
             min_len++;
          }
 
-         float rep0_match_base_cost = base_cost + m_is_rep0_single_byte_model[m_cur_state].get_cost(0);
+         bit_cost_t rep0_match_base_cost = base_cost + m_is_rep0_single_byte_model[m_cur_state].get_cost(0);
          for (int match_len = min_len; match_len <= max_len; match_len++)
          {
             // normal rep0
@@ -513,12 +493,12 @@ namespace lzham
       }
    }
 
-   void lzcompressor::state::get_full_match_costs(CLZBase& lzbase, uint dict_pos, float *pBitcosts, uint match_dist, int min_len, int max_len, uint is_match_model_index) const
+   void lzcompressor::state::get_full_match_costs(CLZBase& lzbase, uint dict_pos, bit_cost_t *pBitcosts, uint match_dist, int min_len, int max_len, uint is_match_model_index) const
    {
       dict_pos;
       LZHAM_ASSERT(min_len >= cMinMatchLen);
 
-      float cost = m_is_match_model[is_match_model_index].get_cost(1);
+      bit_cost_t cost = m_is_match_model[is_match_model_index].get_cost(1);
 
       cost += m_is_rep_model[m_cur_state].get_cost(0);
 
@@ -529,11 +509,11 @@ namespace lzham
       uint num_extra_bits = lzbase.m_lzx_position_extra_bits[match_slot];
 
       if (num_extra_bits < 3)
-         cost += num_extra_bits;
+         cost += (num_extra_bits << cBitCostScaleShift);
       else
       {
          if (num_extra_bits > 4)
-            cost += (num_extra_bits - 4);
+            cost += ((num_extra_bits - 4) << cBitCostScaleShift);
 
          cost += m_dist_lsb_table.get_cost(match_extra & 15);
       }
@@ -544,7 +524,7 @@ namespace lzham
 
       for (int match_len = min_len; match_len <= max_len; match_len++)
       {
-         float len_cost = cost;
+         bit_cost_t len_cost = cost;
 
          uint match_low_sym = 0;
          if (match_len >= 9)
@@ -758,7 +738,7 @@ namespace lzham
       printf("Pos: %u, state: %u, match_pred: %u, is_match_model_index: %u, is_match: %u, cost: %f\n",
          lzdec.m_pos,
          m_cur_state,
-         lit_pred0, is_match_model_index, lzdec.is_match(), get_cost(lzbase, dict, lzdec));
+         lit_pred0, is_match_model_index, lzdec.is_match(), get_cost(lzbase, dict, lzdec) / (float)cBitCostScale);
 
       if (!lzdec.is_match())
       {
@@ -1052,35 +1032,37 @@ namespace lzham
       }
    }
 
-   void lzcompressor::coding_stats::update(const lzdecision& lzdec, const state& cur_state, const search_accelerator& dict, float cost)
+   void lzcompressor::coding_stats::update(const lzdecision& lzdec, const state& cur_state, const search_accelerator& dict, bit_cost_t cost)
    {
       m_total_bytes += lzdec.get_len();
       m_total_contexts++;
 
-      m_total_cost += cost;
+      float cost_in_bits = cost / (float)cBitCostScale;
+
+      m_total_cost += cost_in_bits;
 
       uint match_pred = cur_state.get_pred_char(dict, lzdec.m_pos, 1);
       uint is_match_model_index = LZHAM_COMPUTE_IS_MATCH_MODEL_INDEX(match_pred, cur_state.m_cur_state);
 
       if (lzdec.m_len == 0)
       {
-         float match_bit_cost = cur_state.m_is_match_model[is_match_model_index].get_cost(0);
+         bit_cost_t match_bit_cost = cur_state.m_is_match_model[is_match_model_index].get_cost(0);
          m_total_is_match0_bits_cost += match_bit_cost;
          m_total_match_bits_cost += match_bit_cost;
-         m_worst_match_bits_cost = math::maximum<double>(m_worst_match_bits_cost, match_bit_cost);
+         m_worst_match_bits_cost = math::maximum<double>(m_worst_match_bits_cost, static_cast<double>(match_bit_cost));
          m_total_nonmatches++;
 
          if (cur_state.m_cur_state < CLZBase::cNumLitStates)
          {
             m_total_lits++;
-            m_total_lit_cost += cost;
-            m_worst_lit_cost = math::maximum<double>(m_worst_lit_cost, cost);
+            m_total_lit_cost += cost_in_bits;
+            m_worst_lit_cost = math::maximum<double>(m_worst_lit_cost, cost_in_bits);
          }
          else
          {
             m_total_delta_lits++;
-            m_total_delta_lit_cost += cost;
-            m_worst_delta_lit_cost = math::maximum<double>(m_worst_delta_lit_cost, cost);
+            m_total_delta_lit_cost += cost_in_bits;
+            m_worst_delta_lit_cost = math::maximum<double>(m_worst_delta_lit_cost, cost_in_bits);
          }
       }
       else
@@ -1113,10 +1095,10 @@ namespace lzham
             }
          }
 
-         float match_bit_cost = cur_state.m_is_match_model[is_match_model_index].get_cost(1);
+         bit_cost_t match_bit_cost = cur_state.m_is_match_model[is_match_model_index].get_cost(1);
          m_total_is_match1_bits_cost += match_bit_cost;
          m_total_match_bits_cost += match_bit_cost;
-         m_worst_match_bits_cost = math::maximum<double>(m_worst_match_bits_cost, match_bit_cost);
+         m_worst_match_bits_cost = math::maximum<double>(m_worst_match_bits_cost, static_cast<double>(match_bit_cost));
          m_total_matches++;
 
          if (lzdec.m_dist < 0)
@@ -1136,14 +1118,14 @@ namespace lzham
                if (lzdec.m_len == 1)
                {
                   m_total_rep0_len1_matches++;
-                  m_total_rep0_len1_cost += cost;
-                  m_worst_rep0_len1_cost = math::maximum<double>(m_worst_rep0_len1_cost, cost);
+                  m_total_rep0_len1_cost += cost_in_bits;
+                  m_worst_rep0_len1_cost = math::maximum<double>(m_worst_rep0_len1_cost, cost_in_bits);
                }
                else
                {
                   m_total_rep_matches[0]++;
-                  m_total_rep_cost[0] += cost;
-                  m_worst_rep_cost[0] = math::maximum<double>(m_worst_rep_cost[0], cost);
+                  m_total_rep_cost[0] += cost_in_bits;
+                  m_worst_rep_cost[0] = math::maximum<double>(m_worst_rep_cost[0], cost_in_bits);
                }
             }
             else
@@ -1157,15 +1139,15 @@ namespace lzham
 
                LZHAM_ASSERT(match_hist_index < CLZBase::cMatchHistSize);
                m_total_rep_matches[match_hist_index]++;
-               m_total_rep_cost[match_hist_index] += cost;
-               m_worst_rep_cost[match_hist_index] = math::maximum<double>(m_worst_rep_cost[match_hist_index], cost);
+               m_total_rep_cost[match_hist_index] += cost_in_bits;
+               m_worst_rep_cost[match_hist_index] = math::maximum<double>(m_worst_rep_cost[match_hist_index], cost_in_bits);
             }
          }
          else
          {
             m_total_full_matches[lzdec.get_len()]++;
-            m_total_full_match_cost[lzdec.get_len()] += cost;
-            m_worst_full_match_cost[lzdec.get_len()] = math::maximum<double>(m_worst_full_match_cost[lzdec.get_len()], cost);
+            m_total_full_match_cost[lzdec.get_len()] += cost_in_bits;
+            m_worst_full_match_cost[lzdec.get_len()] = math::maximum<double>(m_worst_full_match_cost[lzdec.get_len()], cost_in_bits);
 
             if (lzdec.get_len() == 2)
             {
@@ -1457,8 +1439,15 @@ namespace lzham
       if (!m_codec.stop_encoding(true))
          return false;
 
-      if (!m_comp_buf.append(m_codec.get_encoding_buf()))
-         return false;
+      if (m_comp_buf.empty())
+      {
+         m_comp_buf.swap(m_codec.get_encoding_buf());
+      }
+      else
+      {
+         if (!m_comp_buf.append(m_codec.get_encoding_buf()))
+            return false;
+      }
 
       m_block_index++;
 
@@ -1489,7 +1478,7 @@ namespace lzham
    void lzcompressor::node::add_state(
       int parent_index, int parent_state_index,
       const lzdecision &lzdec, state &parent_state,
-      float total_cost,
+      bit_cost_t total_cost,
       uint total_complexity)
    {
       state_base trial_state;
@@ -1592,7 +1581,7 @@ namespace lzham
       approx_state.save_partial_state(first_node_state.m_saved_state);
       first_node_state.m_parent_index = -1;
       first_node_state.m_parent_state_index = -1;
-      first_node_state.m_total_cost = 0.0f;
+      first_node_state.m_total_cost = 0;
       first_node_state.m_total_complexity = 0;
 
       const uint bytes_to_parse = parse_state.m_bytes_to_match;
@@ -1607,7 +1596,7 @@ namespace lzham
       uint match_lens[cMaxFullMatches];
       uint match_distances[cMaxFullMatches];
 
-      float lzdec_bitcosts[cMaxMatchLen + 1];
+      bit_cost_t lzdec_bitcosts[cMaxMatchLen + 1];
 
       node prev_lit_node;
       prev_lit_node.clear();
@@ -1670,7 +1659,7 @@ namespace lzham
 
             uint is_match_model_index = LZHAM_COMPUTE_IS_MATCH_MODEL_INDEX(lit_pred0, approx_state.m_cur_state);
 
-            const float cur_node_total_cost = cur_node_state.m_total_cost;
+            const bit_cost_t cur_node_total_cost = cur_node_state.m_total_cost;
             const uint cur_node_total_complexity = cur_node_state.m_total_complexity;
 
             // rep matches
@@ -1703,13 +1692,13 @@ namespace lzham
 #if LZHAM_VERIFY_MATCH_COSTS
                      {
                         lzdecision actual_dec(cur_dict_ofs, l, -((int)rep_match_index + 1));
-                        float actual_cost = approx_state.get_cost(*this, m_accel, actual_dec);
-                        LZHAM_ASSERT(fabs(actual_cost - lzdec_bitcosts[l]) < .000125f);
+                        bit_cost_t actual_cost = approx_state.get_cost(*this, m_accel, actual_dec);
+                        LZHAM_ASSERT(actual_cost == lzdec_bitcosts[l]);
                      }
 #endif
                      node& dst_node = pCur_node[l];
 
-                     float rep_match_total_cost = cur_node_total_cost + lzdec_bitcosts[l];
+                     bit_cost_t rep_match_total_cost = cur_node_total_cost + lzdec_bitcosts[l];
 
                      dst_node.add_state(cur_node_index, cur_node_state_index, lzdecision(cur_dict_ofs, l, -((int)rep_match_index + 1)), approx_state, rep_match_total_cost, rep_match_total_complexity);
                   }
@@ -1724,7 +1713,7 @@ namespace lzham
             if (len2_match_dist)
             {
                lzdecision lzdec(cur_dict_ofs, 2, len2_match_dist);
-               float actual_cost = approx_state.get_cost(*this, m_accel, lzdec);
+               bit_cost_t actual_cost = approx_state.get_cost(*this, m_accel, lzdec);
                pCur_node[2].add_state(cur_node_index, cur_node_state_index, lzdec, approx_state, cur_node_total_cost + actual_cost, cur_node_total_complexity + cShortMatchComplexity);
 
                min_truncate_match_len = LZHAM_MAX(min_truncate_match_len, 2);
@@ -1754,13 +1743,13 @@ namespace lzham
 #if LZHAM_VERIFY_MATCH_COSTS
                      {
                         lzdecision actual_dec(cur_dict_ofs, l, match_dist);
-                        float actual_cost = approx_state.get_cost(*this, m_accel, actual_dec);
-                        LZHAM_ASSERT(fabs(actual_cost - lzdec_bitcosts[l]) < .000125f);
+                        bit_cost_t actual_cost = approx_state.get_cost(*this, m_accel, actual_dec);
+                        LZHAM_ASSERT(actual_cost == lzdec_bitcosts[l]);
                      }
 #endif
                      node& dst_node = pCur_node[l];
 
-                     float match_total_cost = cur_node_total_cost + lzdec_bitcosts[l];
+                     bit_cost_t match_total_cost = cur_node_total_cost + lzdec_bitcosts[l];
                      uint match_total_complexity = cur_node_total_complexity + match_complexity;
 
                      dst_node.add_state( cur_node_index, cur_node_state_index, lzdecision(cur_dict_ofs, l, match_dist), approx_state, match_total_cost, match_total_complexity);
@@ -1771,14 +1760,14 @@ namespace lzham
             }
 
             // literal
-            float lit_cost = approx_state.get_lit_cost(m_accel, cur_dict_ofs, lit_pred0, is_match_model_index);
-            float lit_total_cost = cur_node_total_cost + lit_cost;
+            bit_cost_t lit_cost = approx_state.get_lit_cost(m_accel, cur_dict_ofs, lit_pred0, is_match_model_index);
+            bit_cost_t lit_total_cost = cur_node_total_cost + lit_cost;
             uint lit_total_complexity = cur_node_total_complexity + cLitComplexity;
 #if LZHAM_VERIFY_MATCH_COSTS
             {
                lzdecision actual_dec(cur_dict_ofs, 0, 0);
-               float actual_cost = approx_state.get_cost(*this, m_accel, actual_dec);
-               LZHAM_ASSERT(fabs(actual_cost - lit_cost) < .000125f);
+               bit_cost_t actual_cost = approx_state.get_cost(*this, m_accel, actual_dec);
+               LZHAM_ASSERT(actual_cost == lit_cost);
             }
 #endif
 
@@ -1799,7 +1788,7 @@ namespace lzham
          return false;
       }
 
-      float lowest_final_cost = math::cNearlyInfinite;
+      bit_cost_t lowest_final_cost = cBitCostMax; //math::cNearlyInfinite;
       int node_state_index = 0;
       node_state *pLast_node_states = pNodes[bytes_to_parse].m_node_states;
       for (uint i = 0; i < pNodes[bytes_to_parse].m_num_node_states; i++)
@@ -1841,13 +1830,17 @@ namespace lzham
 
       node_state *pNodes = reinterpret_cast<node_state*>(parse_state.m_nodes);
       pNodes[0].m_parent_index = -1;
-      pNodes[0].m_total_cost = 0.0f;
+      pNodes[0].m_total_cost = 0;
       pNodes[0].m_total_complexity = 0;
 
+#if 0
       for (uint i = 1; i <= cMaxParseGraphNodes; i++)
       {
          pNodes[i].clear();
       }
+#else
+      memset( &pNodes[1], 0xFF, cMaxParseGraphNodes * sizeof(node_state));
+#endif
 
       state &approx_state = parse_state.m_approx_state;
 
@@ -1863,7 +1856,7 @@ namespace lzham
       uint match_lens[cMaxFullMatches];
       uint match_distances[cMaxFullMatches];
 
-      float lzdec_bitcosts[cMaxMatchLen + 1];
+      bit_cost_t lzdec_bitcosts[cMaxMatchLen + 1];
 
       while (cur_node_index < bytes_to_parse)
       {
@@ -1881,7 +1874,9 @@ namespace lzham
             approx_state.partial_advance(pCur_node->m_lzdec);
          }
 
-         const float cur_node_total_cost = pCur_node->m_total_cost;
+         const bit_cost_t cur_node_total_cost = pCur_node->m_total_cost;
+         // This assert includes a fudge factor - make sure we don't overflow our scaled costs.
+         LZHAM_ASSERT((cBitCostMax - cur_node_total_cost) > (cBitCostScale * 64));
          const uint cur_node_total_complexity = pCur_node->m_total_complexity;
 
          const uint lit_pred0 = approx_state.get_pred_char(m_accel, cur_dict_ofs, 1);
@@ -1919,13 +1914,13 @@ namespace lzham
 #if LZHAM_VERIFY_MATCH_COSTS
                   {
                      lzdecision actual_dec(cur_dict_ofs, l, -((int)rep_match_index + 1));
-                     float actual_cost = approx_state.get_cost(*this, m_accel, actual_dec);
-                     LZHAM_ASSERT(fabs(actual_cost - lzdec_bitcosts[l]) < .000125f);
+                     bit_cost_t actual_cost = approx_state.get_cost(*this, m_accel, actual_dec);
+                     LZHAM_ASSERT(actual_cost == lzdec_bitcosts[l]);
                   }
 #endif
                   node_state& dst_node = pCur_node[l];
 
-                  float rep_match_total_cost = cur_node_total_cost + lzdec_bitcosts[l];
+                  bit_cost_t rep_match_total_cost = cur_node_total_cost + lzdec_bitcosts[l];
 
                   if ((rep_match_total_cost > dst_node.m_total_cost) || ((rep_match_total_cost == dst_node.m_total_cost) && (rep_match_total_complexity >= dst_node.m_total_complexity)))
                      continue;
@@ -1962,19 +1957,19 @@ namespace lzham
                uint len2_match_dist = m_accel.get_len2_match(cur_lookahead_ofs);
                if (len2_match_dist)
                {
-                  float cost = approx_state.get_len2_match_cost(*this, cur_dict_ofs, len2_match_dist, is_match_model_index);
+                  bit_cost_t cost = approx_state.get_len2_match_cost(*this, cur_dict_ofs, len2_match_dist, is_match_model_index);
 
 #if LZHAM_VERIFY_MATCH_COSTS
                   {
                      lzdecision actual_dec(cur_dict_ofs, 2, len2_match_dist);
-                     float actual_cost = approx_state.get_cost(*this, m_accel, actual_dec);
-                     LZHAM_ASSERT(fabs(actual_cost - cost) < .000125f);
+                     bit_cost_t actual_cost = approx_state.get_cost(*this, m_accel, actual_dec);
+                     LZHAM_ASSERT(actual_cost == cost);
                   }
 #endif
 
                   node_state& dst_node = pCur_node[2];
 
-                  float match_total_cost = cur_node_total_cost + cost;
+                  bit_cost_t match_total_cost = cur_node_total_cost + cost;
                   uint match_total_complexity = cur_node_total_complexity + cShortMatchComplexity;
 
                   if ((match_total_cost < dst_node.m_total_cost) || ((match_total_cost == dst_node.m_total_cost) && (match_total_complexity < dst_node.m_total_complexity)))
@@ -2036,13 +2031,13 @@ namespace lzham
 #if LZHAM_VERIFY_MATCH_COSTS
                      {
                         lzdecision actual_dec(cur_dict_ofs, l, match_dist);
-                        float actual_cost = approx_state.get_cost(*this, m_accel, actual_dec);
-                        LZHAM_ASSERT(fabs(actual_cost - lzdec_bitcosts[l]) < .000125f);
+                        bit_cost_t actual_cost = approx_state.get_cost(*this, m_accel, actual_dec);
+                        LZHAM_ASSERT(actual_cost == lzdec_bitcosts[l]);
                      }
 #endif
                      node_state& dst_node = pCur_node[l];
 
-                     float match_total_cost = cur_node_total_cost + lzdec_bitcosts[l];
+                     bit_cost_t match_total_cost = cur_node_total_cost + lzdec_bitcosts[l];
                      uint match_total_complexity = cur_node_total_complexity + match_complexity;
 
                      if ((match_total_cost > dst_node.m_total_cost) || ((match_total_cost == dst_node.m_total_cost) && (match_total_complexity >= dst_node.m_total_complexity)))
@@ -2069,14 +2064,14 @@ namespace lzham
          }
 
          // literal
-         float lit_cost = approx_state.get_lit_cost(m_accel, cur_dict_ofs, lit_pred0, is_match_model_index);
-         float lit_total_cost = cur_node_total_cost + lit_cost;
+         bit_cost_t lit_cost = approx_state.get_lit_cost(m_accel, cur_dict_ofs, lit_pred0, is_match_model_index);
+         bit_cost_t lit_total_cost = cur_node_total_cost + lit_cost;
          uint lit_total_complexity = cur_node_total_complexity + cLitComplexity;
 #if LZHAM_VERIFY_MATCH_COSTS
          {
             lzdecision actual_dec(cur_dict_ofs, 0, 0);
-            float actual_cost = approx_state.get_cost(*this, m_accel, actual_dec);
-            LZHAM_ASSERT(fabs(actual_cost - lit_cost) < .000125f);
+            bit_cost_t actual_cost = approx_state.get_cost(*this, m_accel, actual_dec);
+            LZHAM_ASSERT(actual_cost == lit_cost);
          }
 #endif
          if ((lit_total_cost < pCur_node[1].m_total_cost) || ((lit_total_cost == pCur_node[1].m_total_cost) && (lit_total_complexity < pCur_node[1].m_total_complexity)))
@@ -2212,7 +2207,7 @@ namespace lzham
          if (largest_match_index < 0)
             return false;
 
-         float largest_match_cost = lzdecisions0[largest_match_index].m_cost;
+         bit_cost_t largest_match_cost = lzdecisions0[largest_match_index].m_cost;
          uint largest_match_len = lzdecisions0[largest_match_index].get_len();
 
          for (uint j = 0; j < lzdecisions0.size(); j++)
@@ -2368,7 +2363,7 @@ namespace lzham
                      LZHAM_ASSERT(i < (int)best_decisions.size());
 
 #if LZHAM_UPDATE_STATS
-                     float cost = m_state.get_cost(*this, m_accel, best_decisions[i]);
+                     bit_cost_t cost = m_state.get_cost(*this, m_accel, best_decisions[i]);
                      m_stats.update(best_decisions[i], m_state, m_accel, cost);
 #endif
 
@@ -2450,8 +2445,15 @@ namespace lzham
       {
          scoped_perf_section append_timer("append");
 
-         if (!m_comp_buf.append(m_codec.get_encoding_buf()))
-            return false;
+         if (m_comp_buf.empty())
+         {
+            m_comp_buf.swap(m_codec.get_encoding_buf());
+         }
+         else
+         {
+            if (!m_comp_buf.append(m_codec.get_encoding_buf()))
+               return false;
+         }
       }
 #if LZHAM_UPDATE_STATS
       LZHAM_VERIFY(m_stats.m_total_bytes == m_src_size);

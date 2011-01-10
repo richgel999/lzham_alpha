@@ -32,7 +32,8 @@
 				<Option compiler="gcc" />
 				<Option createDefFile="1" />
 				<Compiler>
-					<Add option="-O2" />
+					<Add option="-fomit-frame-pointer" />
+					<Add option="-O3" />
 					<Add option="-Wall" />
 					<Add option="-m32" />
 					<Add option="-DNDEBUG" />
@@ -65,7 +66,8 @@
 				<Option compiler="gcc" />
 				<Option createDefFile="1" />
 				<Compiler>
-					<Add option="-O2" />
+					<Add option="-fomit-frame-pointer" />
+					<Add option="-O3" />
 					<Add option="-Wall" />
 					<Add option="-DNDEBUG" />
 					<Add directory="..\include" />

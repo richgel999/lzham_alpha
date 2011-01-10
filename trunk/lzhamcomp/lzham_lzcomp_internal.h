@@ -1,24 +1,5 @@
 // File: lzham_lzcomp_internal.h
-//
-// Copyright (c) 2009-2010 Richard Geldreich, Jr. <richgel99@gmail.com>
-//
-// Permission is hereby granted, free of charge, to any person obtaining a copy
-// of this software and associated documentation files (the "Software"), to deal
-// in the Software without restriction, including without limitation the rights
-// to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-// copies of the Software, and to permit persons to whom the Software is
-// furnished to do so, subject to the following conditions:
-//
-// The above copyright notice and this permission notice shall be included in
-// all copies or substantial portions of the Software.
-//
-// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-// IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-// FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-// AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-// LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-// OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
-// THE SOFTWARE.
+// See Copyright Notice and license at the end of include/lzham.h
 #pragma once
 #include "lzham_match_accel.h"
 #include "lzham_symbol_codec.h"
@@ -203,15 +184,15 @@ namespace lzham
 
          bool init(CLZBase& lzbase, bool fast_adaptive_huffman_updating, bool use_polar_codes);
 
-         float get_cost(CLZBase& lzbase, const search_accelerator& dict, const lzdecision& lzdec) const;
-         float get_len2_match_cost(CLZBase& lzbase, uint dict_pos, uint len2_match_dist, uint is_match_model_index);
-         float get_lit_cost(const search_accelerator& dict, uint dict_pos, uint lit_pred0, uint is_match_model_index) const;
+         bit_cost_t get_cost(CLZBase& lzbase, const search_accelerator& dict, const lzdecision& lzdec) const;
+         bit_cost_t get_len2_match_cost(CLZBase& lzbase, uint dict_pos, uint len2_match_dist, uint is_match_model_index);
+         bit_cost_t get_lit_cost(const search_accelerator& dict, uint dict_pos, uint lit_pred0, uint is_match_model_index) const;
 
          // Returns actual cost.
-         void get_rep_match_costs(uint dict_pos, float *pBitcosts, uint match_hist_index, int min_len, int max_len, uint is_match_model_index) const;
-         void get_full_match_costs(CLZBase& lzbase, uint dict_pos, float *pBitcosts, uint match_dist, int min_len, int max_len, uint is_match_model_index) const;
+         void get_rep_match_costs(uint dict_pos, bit_cost_t *pBitcosts, uint match_hist_index, int min_len, int max_len, uint is_match_model_index) const;
+         void get_full_match_costs(CLZBase& lzbase, uint dict_pos, bit_cost_t *pBitcosts, uint match_dist, int min_len, int max_len, uint is_match_model_index) const;
 
-         float update_stats(CLZBase& lzbase, const search_accelerator& dict, const lzdecision& lzdec);
+         bit_cost_t update_stats(CLZBase& lzbase, const search_accelerator& dict, const lzdecision& lzdec);
 
          bool encode(symbol_codec& codec, CLZBase& lzbase, const search_accelerator& dict, const lzdecision& lzdec);
          void print(symbol_codec& codec, CLZBase& lzbase, const search_accelerator& dict, const lzdecision& lzdec);
@@ -240,8 +221,7 @@ namespace lzham
          adaptive_bit_model m_is_rep0_single_byte_model[CLZBase::cNumStates];
          adaptive_bit_model m_is_rep1_model[CLZBase::cNumStates];
          adaptive_bit_model m_is_rep2_model[CLZBase::cNumStates];
-        
-        
+                
          typedef quasi_adaptive_huffman_data_model sym_data_model;
          sym_data_model m_lit_table[1 << CLZBase::cNumLitPredBits];
          sym_data_model m_delta_lit_table[1 << CLZBase::cNumDeltaLitPredBits];
@@ -258,7 +238,7 @@ namespace lzham
 
          void clear();
 
-         void update(const lzdecision& lzdec, const state& cur_state, const search_accelerator& dict, float cost);
+         void update(const lzdecision& lzdec, const state& cur_state, const search_accelerator& dict, bit_cost_t cost);
          void print();
 
          uint m_total_bytes;
@@ -336,7 +316,7 @@ namespace lzham
       {
          LZHAM_FORCE_INLINE void clear()
          {
-            m_total_cost = math::cNearlyInfinite;
+            m_total_cost = cBitCostMax; //math::cNearlyInfinite;
             m_total_complexity = UINT_MAX;
          }
          
@@ -347,7 +327,7 @@ namespace lzham
          state::state_base m_saved_state;     
          
          // Total cost to arrive at this node state.
-         float m_total_cost;                 
+         bit_cost_t m_total_cost;                 
          uint m_total_complexity;
          
          // Parent node index.
@@ -368,7 +348,7 @@ namespace lzham
          enum { cMaxNodeStates = 4 };
          node_state m_node_states[cMaxNodeStates];
          
-         void add_state(int parent_index, int parent_state_index, const lzdecision &lzdec, state &parent_state,float total_cost, uint total_complexity);
+         void add_state(int parent_index, int parent_state_index, const lzdecision &lzdec, state &parent_state, bit_cost_t total_cost, uint total_complexity);
       };
 
       state m_initial_state;                    // state at start of block
