@@ -15,9 +15,13 @@ LZHAM is the result of several years of research and experience in the field of 
   Another fast non-optimal prefix code construction algorithm was created by Graham Fyffe in 1999:
    * http://code.google.com/p/lzham/wiki/FyffeCodes
 
-  * Multithreaded forward near-optimal parsing: Internally, the compressor works on 512KB blocks at a time. Each block is subdivided into non-overlapping 3KB sections. Each section is parsed in parallel using Dijkstra's algorithm starting from the same coding state, which remains mostly static during parsing. (Symbol statistics are not updated during parsing, but the state machine and match history buffer are accurately updated.) Once all parallel parse jobs are completed the main thread codes the results using the true coding state.
+  * Multithreaded forward near-optimal parsing: Internally, the compressor works on 512KB blocks at a time. Each block is subdivided into non-overlapping 3KB sections. Each section is parsed in parallel using a streamlined/simplified version of Dijkstra's algorithm starting from the same coding state, which remains mostly static during parsing. (Symbol statistics are not updated during parsing, but the state machine and match history buffer are accurately updated.) Once all parallel parse jobs are completed the main thread codes the results using the true coding state.
 
   alpha3 supports up to 4 simultaneous parsers - 1 running on the main thread, and 3 running on helper threads.
+
+  The latest alpha version of the compressor also supports an "extreme" optimal parser, which tracks up to three solutions (and bitprices) per lookahead character. This allows the compressor to make locally suboptimal decisions as long as the end result is cheaper.
+
+  The current parsers use frozen symbol statistics during parsing, but I'm planning on investigating how difficult it would be to use fully accurate statistics in each step of the parse.
 
   * Multithreaded lock-free match finder: LZHAM's current search acceleration data structure is fairly basic but is designed to be efficiently updated in parallel with parsing and coding. It uses a 64K (256^2) entry hash table, where each hash table entry contains a dictionary index to the root of a unbalanced binary tree of dictionary strings. The strings within each tree begin with the same 2 byte sequence (digram). There are left/right indices associated with each dictionary entry. New strings are inserted starting at the root of the proper tree, and matches are determined during insertion. The worse case depth of each tree is limited by compressor settings.
 
