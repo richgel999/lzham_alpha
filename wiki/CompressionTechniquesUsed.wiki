@@ -27,7 +27,7 @@ LZHAM is the result of several years of research and experience in the field of 
 
   Before parsing, the main thread scans each 512KB block to determine all unique character digrams present in the block. The list of unique digrams is equally subdivided and distributed to the finder threads. Each digram (and binary tree) is associated with only a single helper thread, eliminating any need for synchronization while inserting strings and finding matches.
 
-  Each match finder thread exhaustively finds a list of roughly sorted matches for every dictionary entry that begins with a digram assigned to that thread. The match lists are atomically concatenated to the end of a large match list buffer, and pointers to the beginning of each match list in this buffer are set atomically in a match reference buffer. Once the match list pointer is atomically set a parser thread can immediately consume the list.
+  Each match finder thread exhaustively finds a list of roughly sorted matches for every dictionary entry that begins with a digram assigned to that thread. The match lists are atomically concatenated to the end of a large match list buffer, and pointers to the beginning of each match list in this buffer are set atomically in a match reference buffer. Once the match list pointer is atomically set a parser thread can immediately consume the list in a lock-free manner.
 
   The parser threads consume the output from the finder threads. Hopefully, the finder threads always "stay ahead" of the parsers. If not, the parsers back off by spinning and eventually sleeping for a bit to give the finder threads a chance to catch up and get ahead.
 
