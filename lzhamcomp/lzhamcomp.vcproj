@@ -310,6 +310,10 @@
 				>
 			</File>
 			<File
+				RelativePath=".\lzham_lzcomp_state.cpp"
+				>
+			</File>
+			<File
 				RelativePath=".\lzham_match_accel.cpp"
 				>
 			</File>

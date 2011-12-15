@@ -1,4 +1,4 @@
-LZHAM Lossless Data Compression Codec - Alpha6 - Released Jan. 9, 2011
+LZHAM Lossless Data Compression Codec - Alpha7 - Released Dec. 14, 2011
 Copyright (c) 2009-2011 Richard Geldreich, Jr. <richgel99@gmail.com>
 MIT License - http://code.google.com/p/lzham/
 

@@ -42,5 +42,5 @@ namespace lzham
       
       LZHAM_VERIFY(m_num_lzx_slots);
    }
-   
+
 } //namespace lzham

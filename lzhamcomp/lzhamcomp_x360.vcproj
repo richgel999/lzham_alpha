@@ -162,6 +162,10 @@
 				>
 			</File>
 			<File
+				RelativePath=".\lzham_lzcomp_state.cpp"
+				>
+			</File>
+			<File
 				RelativePath=".\lzham_lzcomp_internal.cpp"
 				>
 			</File>

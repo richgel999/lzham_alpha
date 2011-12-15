@@ -20,7 +20,7 @@ namespace lzham
    struct dict_match
    {
       uint m_dist;
-      uint8 m_len;
+      uint16 m_len;
 
       inline uint get_dist() const { return m_dist & 0x7FFFFFFF; }
       inline uint get_len() const { return m_len + 2; }
@@ -59,15 +59,22 @@ namespace lzham
       bool add_bytes_begin(uint num_bytes, const uint8* pBytes);
       inline atomic32_t get_num_completed_helper_threads() const { return m_num_completed_helper_threads; }
       void add_bytes_end();
+
+      // Returns the lookahead's raw position/size/dict_size at the time add_bytes_begin() is called.
+      inline uint get_fill_lookahead_pos() const { return m_fill_lookahead_pos; }
+      inline uint get_fill_lookahead_size() const { return m_fill_lookahead_size; }
+      inline uint get_fill_dict_size() const { return m_fill_dict_size; }
       
       uint get_len2_match(uint lookahead_ofs);
       dict_match* find_matches(uint lookahead_ofs, bool spin = true);
             
       void advance_bytes(uint num_bytes);
       
-      LZHAM_FORCE_INLINE uint get_match_len(uint lookahead_ofs, int dist, uint max_match_len) const
+      LZHAM_FORCE_INLINE uint get_match_len(uint lookahead_ofs, int dist, uint max_match_len, uint start_match_len = 0) const
       {
          LZHAM_ASSERT(lookahead_ofs < m_lookahead_size);
+         LZHAM_ASSERT(start_match_len <= max_match_len);
+         LZHAM_ASSERT(max_match_len <= (get_lookahead_size() - lookahead_ofs));
 
          const int find_dict_size = m_cur_dict_size + lookahead_ofs;
          if (dist > find_dict_size)
@@ -80,7 +87,7 @@ namespace lzham
          const uint8* pLookahead = &m_dict[lookahead_pos];
          
          uint match_len;
-         for (match_len = 0; match_len < max_match_len; match_len++)
+         for (match_len = start_match_len; match_len < max_match_len; match_len++)
             if (pComp[match_len] != pLookahead[match_len])
                break;
 

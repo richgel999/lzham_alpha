@@ -19,6 +19,11 @@ extern "C" LZHAM_DLL_EXPORT lzham_decompress_state_ptr lzham_decompress_init(con
    return lzham::lzham_lib_decompress_init(pParams);
 }
 
+extern "C" LZHAM_DLL_EXPORT lzham_decompress_state_ptr lzham_decompress_reinit(lzham_decompress_state_ptr p, const lzham_decompress_params *pParams)
+{
+   return lzham::lzham_lib_decompress_reinit(p, pParams);
+}
+
 extern "C" LZHAM_DLL_EXPORT lzham_uint32 lzham_decompress_deinit(lzham_decompress_state_ptr p)
 {
    return lzham::lzham_lib_decompress_deinit(p);

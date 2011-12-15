@@ -10,4 +10,4 @@ EXPORTS
     lzham_decompress @8
     lzham_decompress_deinit @9
     lzham_decompress_memory @10
-
+	lzham_decompress_reinit @11

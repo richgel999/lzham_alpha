@@ -5,6 +5,9 @@
 #include "lzham_huffman_codes.h"
 #include "lzham_polar_codes.h"
 
+// Set to 1 to enable ~2x more frequent Huffman table updating (at slower decompression).
+#define LZHAM_MORE_FREQUENT_TABLE_UPDATING 1
+
 namespace lzham
 {
    // Using a fixed table to convert from scaled probability to scaled bits for determinism across compilers/run-time libs/platforms.
@@ -275,6 +278,7 @@ namespace lzham
       m_total_count = rhs.m_total_count;
 
       m_sym_freq = rhs.m_sym_freq;
+      m_initial_sym_freq = rhs.m_initial_sym_freq;
 
       m_codes = rhs.m_codes;
       m_code_sizes = rhs.m_code_sizes;
@@ -293,7 +297,7 @@ namespace lzham
             }
          }
       }
-      else
+      else if (m_pDecode_tables)
       {
          lzham_delete(m_pDecode_tables);
          m_pDecode_tables = NULL;
@@ -310,6 +314,7 @@ namespace lzham
    void raw_quasi_adaptive_huffman_data_model::clear()
    {
       m_sym_freq.clear();
+      m_initial_sym_freq.clear();
       m_codes.clear();
       m_code_sizes.clear();
 
@@ -330,19 +335,29 @@ namespace lzham
       m_use_polar_codes = false;
    }
 
-   bool raw_quasi_adaptive_huffman_data_model::init(bool encoding, uint total_syms, bool fast_updating, bool use_polar_codes)
+   bool raw_quasi_adaptive_huffman_data_model::init(bool encoding, uint total_syms, bool fast_updating, bool use_polar_codes, const uint16 *pInitial_sym_freq)
    {
-      clear();
-
       m_encoding = encoding;
       m_fast_updating = fast_updating;
       m_use_polar_codes = use_polar_codes;
+      m_symbols_until_update = 0;
 
       if (!m_sym_freq.try_resize(total_syms))
       {
          clear();
          return false;
       }
+      
+      if (pInitial_sym_freq)
+      {
+         if (!m_initial_sym_freq.try_resize(total_syms))
+         {
+            clear();
+            return false;
+         }
+         memcpy(m_initial_sym_freq.begin(), pInitial_sym_freq, total_syms * m_initial_sym_freq.size_in_bytes());
+      }
+
       if (!m_code_sizes.try_resize(total_syms))
       {
          clear();
@@ -358,10 +373,16 @@ namespace lzham
 
       if (m_encoding)
       {
+         lzham_delete(m_pDecode_tables);
+         m_pDecode_tables = NULL;
+
          if (!m_codes.try_resize(total_syms))
+         {
+            clear();
             return false;
+         }
       }
-      else
+      else if (!m_pDecode_tables)
       {
          m_pDecode_tables = lzham_new<prefix_coding::decoder_tables>();
          if (!m_pDecode_tables)
@@ -371,15 +392,18 @@ namespace lzham
          }
       }
 
+      // TODO: Make this setting a user controllable parameter?
       if (m_fast_updating)
          m_max_cycle = (LZHAM_MAX(64, m_total_syms) + 6) << 5;
       else
       {
-         // pre-alpha1: this was << 2 - which decompresses ~12% slower
-         // alpha5: changing this to *16 vs. *8, ~5% faster
-         m_max_cycle = (LZHAM_MAX(32, m_total_syms) + 6) << 4;
+#if LZHAM_MORE_FREQUENT_TABLE_UPDATING
+         m_max_cycle = (LZHAM_MAX(24, m_total_syms) + 6) * 12;
+#else
+         m_max_cycle = (LZHAM_MAX(32, m_total_syms) + 6) * 16;
+#endif
       }
-      
+
       m_max_cycle = LZHAM_MIN(m_max_cycle, 32767);
 
       reset();
@@ -392,11 +416,25 @@ namespace lzham
       if (!m_total_syms)
          return true;
 
-      for (uint i = 0; i < m_total_syms; i++)
-         m_sym_freq[i] = 1;
+      if (m_initial_sym_freq.size())
+      {
+         m_update_cycle = 0;
+         for (uint i = 0; i < m_total_syms; i++)
+         {
+            uint sym_freq = m_initial_sym_freq[i];
+            m_sym_freq[i] = static_cast<uint16>(sym_freq);
+            m_update_cycle += sym_freq;
+         }
+      }
+      else
+      {
+         for (uint i = 0; i < m_total_syms; i++)
+            m_sym_freq[i] = 1;
+         m_update_cycle = m_total_syms;
+      }
 
       m_total_count = 0;
-      m_update_cycle = m_total_syms;
+      m_symbols_until_update = 0;
 
       if (!update())
          return false;
@@ -489,6 +527,23 @@ namespace lzham
       return true;
    }
 
+   bool raw_quasi_adaptive_huffman_data_model::update(uint sym)
+   {
+      uint freq = m_sym_freq[sym];
+      freq++;
+      m_sym_freq[sym] = static_cast<uint16>(freq);
+
+      LZHAM_ASSERT(freq <= UINT16_MAX);
+
+      if (--m_symbols_until_update == 0)
+      {
+         if (!update())
+            return false;
+      }
+
+      return true;
+   }
+
    adaptive_bit_model::adaptive_bit_model()
    {
       clear();
@@ -503,31 +558,10 @@ namespace lzham
       m_bit_0_prob(other.m_bit_0_prob)
    {
    }
-
-   adaptive_bit_model& adaptive_bit_model::operator= (const adaptive_bit_model& rhs)
-   {
-      m_bit_0_prob = rhs.m_bit_0_prob;
-      return *this;
-   }
-
-   void adaptive_bit_model::clear()
-   {
-      m_bit_0_prob  = 1U << (cSymbolCodecArithProbBits - 1);
-   }
-
+      
    void adaptive_bit_model::set_probability_0(float prob0)
    {
       m_bit_0_prob = static_cast<uint16>(math::clamp<uint>((uint)(prob0 * cSymbolCodecArithProbScale), 1, cSymbolCodecArithProbScale - 1));
-   }
-
-   void adaptive_bit_model::update(uint bit)
-   {
-      if (!bit)
-         m_bit_0_prob += ((cSymbolCodecArithProbScale - m_bit_0_prob) >> cSymbolCodecArithProbMoveBits);
-      else
-         m_bit_0_prob -= (m_bit_0_prob >> cSymbolCodecArithProbMoveBits);
-      LZHAM_ASSERT(m_bit_0_prob >= 1);
-      LZHAM_ASSERT(m_bit_0_prob < cSymbolCodecArithProbScale);
    }
 
    adaptive_arith_data_model::adaptive_arith_data_model(bool encoding, uint total_syms)
@@ -584,6 +618,29 @@ namespace lzham
          m_probs[i].clear();
    }
 
+   void adaptive_arith_data_model::reset_update_rate()
+   {
+   }
+
+   bool adaptive_arith_data_model::update(uint sym)
+   {
+      uint node = 1;
+
+      uint bitmask = m_total_syms;
+
+      do
+      {
+         bitmask >>= 1;
+
+         uint bit = (sym & bitmask) ? 1 : 0;
+         m_probs[node].update(bit);
+         node = (node << 1) + bit;
+
+      } while (bitmask > 1);
+
+      return true;
+   }
+
    bit_cost_t adaptive_arith_data_model::get_cost(uint sym) const
    {
       uint node = 1;
@@ -630,6 +687,12 @@ namespace lzham
       m_output_buf.clear();
       m_arith_output_buf.clear();
       m_output_syms.clear();
+
+      m_pDecode_need_bytes_func = NULL;
+      m_pDecode_private_data = NULL;
+      m_pSaved_huff_model = NULL;
+      m_pSaved_model = NULL;
+      m_saved_node_index = 0;
    }
 
    bool symbol_codec::start_encoding(uint expected_file_size)

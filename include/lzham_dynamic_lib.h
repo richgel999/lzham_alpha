@@ -8,8 +8,7 @@
    #define LZHAM_DLL_FILENAME       "lzham_x360.dll"
    #define LZHAM_DEBUG_DLL_FILENAME "lzham_x360D.dll"
 #else
-   // Under Win32, the path helpers are currently hardcoded to use Unicode, which is probably bad for some folks.
-   // This stuff should probably be moved to another header.
+   // FIXME: This stuff should probably be moved to another header.
    #ifdef _WIN64
       #define LZHAM_DLL_FILENAME       "lzham_x64.dll"
       #define LZHAM_DEBUG_DLL_FILENAME "lzham_x64D.dll"

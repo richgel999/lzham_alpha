@@ -46,12 +46,17 @@
 			<Add directory="../include" />
 			<Add directory="../lzhamdecomp" />
 		</Compiler>
+		<Unit filename="..\include\lzham.h" />
+		<Unit filename="..\include\lzham_dynamic_lib.h" />
+		<Unit filename="..\include\lzham_exports.inc" />
+		<Unit filename="..\include\lzham_static_lib.h" />
 		<Unit filename="lzham_comp.h" />
 		<Unit filename="lzham_lzbase.cpp" />
 		<Unit filename="lzham_lzbase.h" />
 		<Unit filename="lzham_lzcomp.cpp" />
 		<Unit filename="lzham_lzcomp_internal.cpp" />
 		<Unit filename="lzham_lzcomp_internal.h" />
+		<Unit filename="lzham_lzcomp_state.cpp" />
 		<Unit filename="lzham_match_accel.cpp" />
 		<Unit filename="lzham_match_accel.h" />
 		<Unit filename="lzham_null_threading.h" />
