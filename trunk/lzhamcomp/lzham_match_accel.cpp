@@ -60,7 +60,7 @@ namespace lzham
       m_fill_dict_size = 0;
       m_num_completed_helper_threads = 0;
 
-      if (!m_dict.try_resize_no_construct(max_dict_size + CLZBase::cMaxMatchLen))
+      if (!m_dict.try_resize_no_construct(max_dict_size + LZHAM_MIN(m_max_dict_size, CLZBase::cMaxHugeMatchLen)))
          return false;
 
       if (!m_hash.try_resize_no_construct(cHashSize))
@@ -169,7 +169,7 @@ namespace lzham
             uint pos = cur_pos & m_max_dict_size_mask;
             node *pNode = &m_nodes[pos];
 
-            // Unfortunately, the initial compare match_len must be 2 because of the way we truncate matches at the end of each block.
+            // Unfortunately, the initial compare match_len must be 0 because of the way we hash and truncate matches at the end of each block.
             uint match_len = 0;
             const uint8* pComp = &pDict[pos];
 
@@ -204,7 +204,7 @@ namespace lzham
 
             if (match_len > best_match_len)
             {
-               pDstMatch->m_len = static_cast<uint8>(match_len - CLZBase::cMinMatchLen);
+               pDstMatch->m_len = static_cast<uint16>(match_len - CLZBase::cMinMatchLen);
                pDstMatch->m_dist = delta_pos;
                pDstMatch++;
 
@@ -219,7 +219,7 @@ namespace lzham
             }
             else if (m_all_matches)
             {
-               pDstMatch->m_len = static_cast<uint8>(match_len - CLZBase::cMinMatchLen);
+               pDstMatch->m_len = static_cast<uint16>(match_len - CLZBase::cMinMatchLen);
                pDstMatch->m_dist = delta_pos;
                pDstMatch++;
             }
@@ -412,7 +412,7 @@ namespace lzham
 
          uint next_thread_index = 0;
          const uint8* pDict = &m_dict[m_lookahead_pos & m_max_dict_size_mask];
-         uint num_unique_digrams = 0;
+         uint num_unique_trigrams = 0;
 
          if (num_bytes >= 3)
          {
@@ -431,7 +431,7 @@ namespace lzham
 
                if (m_hash_thread_index[t] == UINT8_MAX)
                {
-                  num_unique_digrams++;
+                  num_unique_trigrams++;
 
                   m_hash_thread_index[t] = static_cast<uint8>(next_thread_index);
                   if (++next_thread_index == m_max_helper_threads)
@@ -459,8 +459,9 @@ namespace lzham
 
       memcpy(&m_dict[add_pos], pBytes, num_bytes);
 
-      if (add_pos < CLZBase::cMaxMatchLen)
-         memcpy(&m_dict[m_max_dict_size], &m_dict[0], CLZBase::cMaxMatchLen);
+      uint dict_bytes_to_mirror = LZHAM_MIN(CLZBase::cMaxHugeMatchLen, m_max_dict_size);
+      if (add_pos < dict_bytes_to_mirror)
+         memcpy(&m_dict[m_max_dict_size], &m_dict[0], dict_bytes_to_mirror);
 
       m_lookahead_size = num_bytes;
 
@@ -491,6 +492,7 @@ namespace lzham
       int match_ref;
       uint spin_count = 0;
 
+      // This may spin until the match finder job(s) catch up to the caller's lookahead position.
       for ( ; ; )
       {
          match_ref = m_match_refs[match_ref_ofs];

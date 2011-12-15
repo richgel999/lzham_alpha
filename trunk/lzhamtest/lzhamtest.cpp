@@ -1,4 +1,7 @@
 // File: lzhamtest.cpp
+// TODO: This is a small app primarily designed to test the codec. It doesn't make the best sample.
+// See the decompress_file() function to see how to use the decompression API, and the compress_file() function for the compression API.
+// See include/lzham.h for documentation on the public LZHAM API.
 // See Copyright Notice and license at the end of include/lzham.h
 #if defined(__GNUC__)
 #define _FILE_OFFSET_BITS 64
@@ -18,6 +21,11 @@
 #define my_max(a,b) (((a) > (b)) ? (a) : (b))
 #define my_min(a,b) (((a) < (b)) ? (a) : (b))
 
+#define LZHAM_PRINT_OUTPUT_PROGRESS
+
+// Note: lzham can be used as static libs, or as a DLL. The default (out of the box) configuration under Win32 loads the DLL.
+// To test lzham as a static library under Win32, set LZHAM_USE_LZHAM_DLL to 0, add ../lzhamcomp and ../lzhamdecomp to the additional inc paths, and link with the lzhamcomp and lzhamdecomp libs.
+// On non-Win32 platforms, this test app currently assumes static libs.
 #ifdef _XBOX
    #include <xtl.h>
    #include <xbdm.h>
@@ -76,12 +84,17 @@ typedef unsigned int uint32;
    #define LZHAMTEST_DEFAULT_DICT_SIZE LZHAM_MAX_DICT_SIZE_LOG2_X86
 #endif
 
-#define LZHAMTEST_COMP_INPUT_BUFFER_SIZE 65536*4
-#define LZHAMTEST_COMP_OUTPUT_BUFFER_SIZE 65536*4
-#define LZHAMTEST_DECOMP_INPUT_BUFFER_SIZE 65536*4
-#define LZHAMTEST_DECOMP_OUTPUT_BUFFER_SIZE 65536*4
-//#define LZHAMTEST_DECOMP_INPUT_BUFFER_SIZE 1
-//#define LZHAMTEST_DECOMP_OUTPUT_BUFFER_SIZE 1
+#if 1
+   #define LZHAMTEST_COMP_INPUT_BUFFER_SIZE 65536*4
+   #define LZHAMTEST_COMP_OUTPUT_BUFFER_SIZE 65536*4
+   #define LZHAMTEST_DECOMP_INPUT_BUFFER_SIZE 65536*4
+   #define LZHAMTEST_DECOMP_OUTPUT_BUFFER_SIZE 65536*4
+#else
+   #define LZHAMTEST_COMP_INPUT_BUFFER_SIZE 1
+   #define LZHAMTEST_COMP_OUTPUT_BUFFER_SIZE 1
+   #define LZHAMTEST_DECOMP_INPUT_BUFFER_SIZE 1
+   #define LZHAMTEST_DECOMP_OUTPUT_BUFFER_SIZE 1
+#endif
 
 #define LZHAMTEST_NO_RANDOM_EXTREME_PARSING 1
 
@@ -97,7 +110,8 @@ struct comp_options
       m_force_polar_codes(false),
       m_randomize_params(false),
       m_extreme_parsing(false),
-      m_deterministic_parsing(false)
+      m_deterministic_parsing(false),
+      m_tradeoff_decomp_rate_for_comp_ratio(false)
    {
    }
 
@@ -113,6 +127,7 @@ struct comp_options
       printf("Extreme parsing: %u\n", (uint)m_extreme_parsing);
       printf("Randomize parameters: %u\n", m_randomize_params);
       printf("Deterministic parsing: %u\n", m_deterministic_parsing);
+      printf("Trade off decompression rate for compression ratio: %u\n", m_tradeoff_decomp_rate_for_comp_ratio);
    }
 
    lzham_compress_level m_comp_level;
@@ -125,6 +140,7 @@ struct comp_options
    bool m_randomize_params;
    bool m_extreme_parsing;
    bool m_deterministic_parsing;
+   bool m_tradeoff_decomp_rate_for_comp_ratio;
 };
 
 static void print_usage()
@@ -150,10 +166,14 @@ static void print_usage()
    printf("-v - Immediately decompress compressed file after compression for verification.\n");
    printf("-p - Use Polar codes in all higher compression levels (faster decompression).\n");
    printf("-x - Extreme parsing, for slight compression gain (Uber only, MUCH slower).\n");
+   printf("-o - Permit the compressor to trade off decompression rate for higher ratios.\n");
+   printf("     Note: This flag can drop the decompression rate by 30%% or more.\n");
    printf("-e - Enable deterministic parsing for slightly higher compression and\n");
    printf("     predictable output files when enabled, but less scalability.\n");
    printf("     The default is disabled, so the generated output data may slightly vary\n");
    printf("     between runs when multithreaded compression is enabled.\n");
+   printf("-afilename Enable delta compression using the specified seed file.\n");
+   printf("           The same seed file MUST be used for compression/decompression.\n");
 }
 
 static void print_error(const char *pMsg, ...)
@@ -254,7 +274,55 @@ static int simple_test(ilzham &lzham_dll, const comp_options &options)
    return EXIT_SUCCESS;
 }
 
-static bool compress_streaming(ilzham &lzham_dll, const char* pSrc_filename, const char *pDst_filename, const comp_options &options)
+static bool read_seed_file(const char *pSeed_filename, lzham_uint32 &num_seed_bytes, const void *&pSeed_bytes, uint dict_size_log2)
+{
+   num_seed_bytes = 0;
+   pSeed_bytes = NULL;
+
+   if (pSeed_filename)
+   {
+      FILE *pSeed_file = fopen(pSeed_filename, "rb");
+      if (!pSeed_file)
+      {
+         print_error("Unable to open seed file: %s\n", pSeed_filename);
+         return false;
+      }
+
+      _fseeki64(pSeed_file, 0, SEEK_END);
+      uint64 seed_file_size = _ftelli64(pSeed_file);
+      _fseeki64(pSeed_file, 0, SEEK_SET);
+
+      lzham_uint32 seed_size = (lzham_uint32)my_min(seed_file_size, 1ULL << dict_size_log2);
+      if (seed_size)
+      {
+         pSeed_bytes = _aligned_malloc(seed_size, 16);
+         if (pSeed_bytes)
+         {
+            num_seed_bytes = (lzham_uint32)seed_size;
+
+            if (fread((void*)pSeed_bytes, 1, seed_size, pSeed_file) != seed_size)
+            {
+               print_error("Failed reading seed file!\n");
+
+               num_seed_bytes = 0;
+
+               _aligned_free((void*)pSeed_bytes);
+               pSeed_bytes = NULL;
+               fclose(pSeed_file);
+               return false;
+            }
+         }
+      }
+
+      fclose(pSeed_file);
+
+      printf("Read Seed File \"%s\", Size: %u bytes\n", pSeed_filename, seed_size);
+   }
+
+   return true;
+}
+
+static bool compress_file(ilzham &lzham_dll, const char* pSrc_filename, const char *pDst_filename, const comp_options &options, const char *pSeed_filename)
 {
    printf("Testing: Streaming compression\n");
 
@@ -318,19 +386,27 @@ static bool compress_streaming(ilzham &lzham_dll, const char* pSrc_filename, con
    params.m_max_helper_threads = options.m_max_helper_threads;
    params.m_level = options.m_comp_level;
    if (options.m_force_polar_codes)
-   {
       params.m_compress_flags |= LZHAM_COMP_FLAG_FORCE_POLAR_CODING;
-   }
    if (options.m_extreme_parsing)
-   {
       params.m_compress_flags |= LZHAM_COMP_FLAG_EXTREME_PARSING;
-   }
    if (options.m_deterministic_parsing)
-   {
       params.m_compress_flags |= LZHAM_COMP_FLAG_DETERMINISTIC_PARSING;
-   }
+   if (options.m_tradeoff_decomp_rate_for_comp_ratio)
+      params.m_compress_flags |= LZHAM_COMP_FLAG_TRADEOFF_DECOMPRESSION_RATE_FOR_COMP_RATIO;
    params.m_cpucache_line_size = 0;
    params.m_cpucache_total_lines = 0;
+   
+   if (pSeed_filename)
+   {
+      if (!read_seed_file(pSeed_filename, params.m_num_seed_bytes, params.m_pSeed_bytes, params.m_dict_size_log2))
+      {
+         _aligned_free(in_file_buf);
+         _aligned_free(out_file_buf);
+         fclose(pInFile);
+         fclose(pOutFile);
+         return false;
+      }
+   }
 
    timer_ticks init_start_time = timer::get_ticks();
    lzham_compress_state_ptr pComp_state = lzham_dll.lzham_compress_init(&params);
@@ -343,6 +419,7 @@ static bool compress_streaming(ilzham &lzham_dll, const char* pSrc_filename, con
       _aligned_free(out_file_buf);
       fclose(pInFile);
       fclose(pOutFile);
+      _aligned_free((void*)params.m_pSeed_bytes);
       return false;
    }
 
@@ -357,10 +434,12 @@ static bool compress_streaming(ilzham &lzham_dll, const char* pSrc_filename, con
          double total_bytes_processed = static_cast<double>(src_file_size - src_bytes_left);
          double comp_rate = (total_elapsed_time > 0.0f) ? total_bytes_processed / total_elapsed_time : 0.0f;
 
+#ifdef LZHAM_PRINT_OUTPUT_PROGRESS
          for (int i = 0; i < 15; i++)
             printf("\b\b\b\b");
          printf("Progress: %3.1f%%, Bytes Remaining: %3.1fMB, %3.3fMB/sec", (1.0f - (static_cast<float>(src_bytes_left) / src_file_size)) * 100.0f, src_bytes_left / 1048576.0f, comp_rate / (1024.0f * 1024.0f));
          printf("                \b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b");
+#endif
       }
 
       if (in_file_buf_ofs == in_file_buf_size)
@@ -375,6 +454,7 @@ static bool compress_streaming(ilzham &lzham_dll, const char* pSrc_filename, con
             _aligned_free(out_file_buf);
             fclose(pInFile);
             fclose(pOutFile);
+            _aligned_free((void*)params.m_pSeed_bytes);
             lzham_dll.lzham_decompress_deinit(pComp_state);
             return false;
          }
@@ -407,6 +487,7 @@ static bool compress_streaming(ilzham &lzham_dll, const char* pSrc_filename, con
             _aligned_free(out_file_buf);
             fclose(pInFile);
             fclose(pOutFile);
+            _aligned_free((void*)params.m_pSeed_bytes);
             lzham_dll.lzham_decompress_deinit(pComp_state);
             return false;
          }
@@ -418,10 +499,12 @@ static bool compress_streaming(ilzham &lzham_dll, const char* pSrc_filename, con
          break;
    }
 
+#ifdef LZHAM_PRINT_OUTPUT_PROGRESS
    for (int i = 0; i < 15; i++)
    {
       printf("\b\b\b\b    \b\b\b\b");
    }
+#endif
 
    src_bytes_left += (in_file_buf_size - in_file_buf_ofs);
 
@@ -437,6 +520,8 @@ static bool compress_streaming(ilzham &lzham_dll, const char* pSrc_filename, con
    in_file_buf = NULL;
    _aligned_free(out_file_buf);
    out_file_buf = NULL;
+   _aligned_free((void*)params.m_pSeed_bytes);
+   params.m_pSeed_bytes = NULL;
 
    fclose(pInFile);
    pInFile = NULL;
@@ -463,7 +548,7 @@ static bool compress_streaming(ilzham &lzham_dll, const char* pSrc_filename, con
    return true;
 }
 
-static bool decompress_file(ilzham &lzham_dll, const char* pSrc_filename, const char *pDst_filename, comp_options options)
+static bool decompress_file(ilzham &lzham_dll, const char* pSrc_filename, const char *pDst_filename, comp_options options, const char *pSeed_filename)
 {
    FILE *pInFile = fopen(pSrc_filename, "rb");
    if (!pInFile)
@@ -563,6 +648,18 @@ static bool decompress_file(ilzham &lzham_dll, const char* pSrc_filename, const 
    timer_ticks start_time = timer::get_ticks();
    double decomp_only_time = 0;
 
+   if (pSeed_filename)
+   {
+      if (!read_seed_file(pSeed_filename, params.m_num_seed_bytes, params.m_pSeed_bytes, params.m_dict_size_log2))
+      {
+         _aligned_free(in_file_buf);
+         _aligned_free(out_file_buf);
+         fclose(pInFile);
+         fclose(pOutFile);
+         return false;
+      }
+   }
+
    timer_ticks init_start_time = timer::get_ticks();
    lzham_decompress_state_ptr pDecomp_state = lzham_dll.lzham_decompress_init(&params);
    timer_ticks total_init_time = timer::get_ticks() - init_start_time;
@@ -571,6 +668,7 @@ static bool decompress_file(ilzham &lzham_dll, const char* pSrc_filename, const 
       print_error("Failed initializing decompressor!\n");
       _aligned_free(in_file_buf);
       _aligned_free(out_file_buf);
+      _aligned_free((void*)params.m_pSeed_bytes);
       fclose(pInFile);
       fclose(pOutFile);
       return false;
@@ -590,6 +688,7 @@ static bool decompress_file(ilzham &lzham_dll, const char* pSrc_filename, const 
             print_error("Failure reading from source file!\n");
             _aligned_free(in_file_buf);
             _aligned_free(out_file_buf);
+            _aligned_free((void*)params.m_pSeed_bytes);
             lzham_dll.lzham_decompress_deinit(pDecomp_state);
             fclose(pInFile);
             fclose(pOutFile);
@@ -626,6 +725,7 @@ static bool decompress_file(ilzham &lzham_dll, const char* pSrc_filename, const 
             print_error("Failure writing to destination file!\n");
             _aligned_free(in_file_buf);
             _aligned_free(out_file_buf);
+            _aligned_free((void*)params.m_pSeed_bytes);
             lzham_dll.lzham_decompress_deinit(pDecomp_state);
             fclose(pInFile);
             fclose(pOutFile);
@@ -637,6 +737,7 @@ static bool decompress_file(ilzham &lzham_dll, const char* pSrc_filename, const 
             print_error("Decompressor wrote too many bytes to destination file!\n");
             _aligned_free(in_file_buf);
             _aligned_free(out_file_buf);
+            _aligned_free((void*)params.m_pSeed_bytes);
             lzham_dll.lzham_decompress_deinit(pDecomp_state);
             fclose(pInFile);
             fclose(pOutFile);
@@ -653,6 +754,9 @@ static bool decompress_file(ilzham &lzham_dll, const char* pSrc_filename, const 
 
    _aligned_free(out_file_buf);
    out_file_buf = NULL;
+
+   _aligned_free((void*)params.m_pSeed_bytes);
+   params.m_pSeed_bytes = NULL;
 
    src_bytes_left += (in_file_buf_size - in_file_buf_ofs);
 
@@ -771,7 +875,7 @@ static bool compare_files(const char *pFilename1, const char* pFilename2)
 typedef std::vector< std::string > string_array;
 
 #if defined(WIN32) || defined(_XBOX)
-static bool find_files(std::string pathname, const std::string &filename, string_array &files, bool recursive)
+static bool find_files(std::string pathname, const std::string &filename, string_array &files, bool recursive, int level = 0)
 {
    if (!pathname.empty())
    {
@@ -784,54 +888,68 @@ static bool find_files(std::string pathname, const std::string &filename, string
 
    HANDLE findHandle = FindFirstFileA((pathname + filename).c_str(), &find_data);
    if (findHandle == INVALID_HANDLE_VALUE)
-      return false;
-
-   do
    {
-      const bool is_directory = (find_data.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) != 0;
-      const bool is_system =  (find_data.dwFileAttributes & FILE_ATTRIBUTE_SYSTEM) != 0;
-      const bool is_hidden =  (find_data.dwFileAttributes & FILE_ATTRIBUTE_HIDDEN) != 0;
+     HRESULT hres = GetLastError();
+     if ((level == 0) && (hres != NO_ERROR) && (hres != ERROR_FILE_NOT_FOUND))
+       return false;
+   }
+   else
+   {
+     do
+     {
+        const bool is_directory = (find_data.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) != 0;
+        const bool is_system = (find_data.dwFileAttributes & FILE_ATTRIBUTE_SYSTEM) != 0;
+        const bool is_hidden = (find_data.dwFileAttributes & FILE_ATTRIBUTE_HIDDEN) != 0;
+        const bool is_temp = (find_data.dwFileAttributes & FILE_ATTRIBUTE_TEMPORARY) != 0;
 
-      std::string filename(find_data.cFileName);
+        std::string filename(find_data.cFileName);
 
-      if ((!is_directory) && (!is_system) && (!is_hidden))
-         files.push_back(pathname + filename);
+        if ((!is_directory) && (!is_system) && (!is_hidden) && (!is_temp))
+           files.push_back(pathname + filename);
 
-   } while (FindNextFileA(findHandle, &find_data));
-
-   FindClose(findHandle);
-
+     } while (FindNextFileA(findHandle, &find_data));
+          
+     FindClose(findHandle);
+   }
+   
    if (recursive)
    {
       string_array paths;
 
       HANDLE findHandle = FindFirstFileA((pathname + "*").c_str(), &find_data);
       if (findHandle == INVALID_HANDLE_VALUE)
-         return false;
-
-      do
       {
-         const bool is_directory = (find_data.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) != 0;
-         const bool is_system =  (find_data.dwFileAttributes & FILE_ATTRIBUTE_SYSTEM) != 0;
-         const bool is_hidden =  (find_data.dwFileAttributes & FILE_ATTRIBUTE_HIDDEN) != 0;
-
-         std::string filename(find_data.cFileName);
-
-         if ((is_directory) && (!is_hidden) && (!is_system))
-            paths.push_back(filename);
-
-      } while (FindNextFileA(findHandle, &find_data));
-
-      FindClose(findHandle);
-
-      for (uint i = 0; i < paths.size(); i++)
-      {
-         const std::string &path = paths[i];
-         if (path[0] == '.')
-            continue;
-
-         if (!find_files(pathname + path, filename, files, true))
+         HRESULT hres = GetLastError();
+         if ((level == 0) && (hres != NO_ERROR) && (hres != ERROR_FILE_NOT_FOUND))
             return false;
+      }
+      else
+      {
+         do
+         {
+            const bool is_directory = (find_data.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) != 0;
+            const bool is_system = (find_data.dwFileAttributes & FILE_ATTRIBUTE_SYSTEM) != 0;
+            const bool is_hidden = (find_data.dwFileAttributes & FILE_ATTRIBUTE_HIDDEN) != 0;
+            const bool is_temp = (find_data.dwFileAttributes & FILE_ATTRIBUTE_TEMPORARY) != 0;
+
+            std::string filename(find_data.cFileName);
+
+            if ((is_directory) && (!is_hidden) && (!is_system) && (!is_temp))
+               paths.push_back(filename);
+
+         } while (FindNextFileA(findHandle, &find_data));
+         
+         FindClose(findHandle);
+            
+         for (uint i = 0; i < paths.size(); i++)
+         {
+            const std::string &path = paths[i];
+            if (path[0] == '.')
+               continue;
+
+            if (!find_files(pathname + path, filename, files, true, level + 1))
+               return false;
+         }
       }
    }
 
@@ -896,7 +1014,7 @@ static bool find_files(std::string pathname, const std::string &filename, string
 }
 #endif
 
-static bool test_recursive(ilzham &lzham_dll, const char *pPath, comp_options options)
+static bool test_recursive(ilzham &lzham_dll, const char *pPath, comp_options options, const char *pSeed_filename)
 {
    string_array files;
    if (!find_files(pPath, "*", files, true))
@@ -957,17 +1075,18 @@ static bool test_recursive(ilzham &lzham_dll, const char *pPath, comp_options op
          file_options.m_comp_level = static_cast<lzham_compress_level>(rand() % LZHAM_TOTAL_COMP_LEVELS);
          file_options.m_dict_size_log2 = LZHAM_MIN_DICT_SIZE_LOG2 + (rand() % (LZHAMTEST_MAX_POSSIBLE_DICT_SIZE - LZHAM_MIN_DICT_SIZE_LOG2 + 1));
          file_options.m_max_helper_threads = rand() % (LZHAM_MAX_HELPER_THREADS + 1);
-         file_options.m_unbuffered_decompression = (rand() & 1) != 0;
+         file_options.m_unbuffered_decompression = ((rand() & 1) != 0) && (!pSeed_filename);
 #if !LZHAMTEST_NO_RANDOM_EXTREME_PARSING
          file_options.m_extreme_parsing = (rand() & 1) != 0;
 #endif
          file_options.m_force_polar_codes = (rand() & 1) != 0;
          file_options.m_deterministic_parsing = (rand() & 1) != 0;
+         file_options.m_tradeoff_decomp_rate_for_comp_ratio = (rand() & 1) != 0;
 
          file_options.print();
       }
 
-      bool status = compress_streaming(lzham_dll, src_file.c_str(), cmp_file, file_options);
+      bool status = compress_file(lzham_dll, src_file.c_str(), cmp_file, file_options, pSeed_filename);
       if (!status)
       {
          print_error("Failed compressing file \"%s\" to \"%s\"\n", src_file.c_str(), cmp_file);
@@ -984,7 +1103,7 @@ static bool test_recursive(ilzham &lzham_dll, const char *pPath, comp_options op
             return false;
          }
 
-         status = decompress_file(lzham_dll, cmp_file, decomp_file, file_options);
+         status = decompress_file(lzham_dll, cmp_file, decomp_file, file_options, pSeed_filename);
          if (!status)
          {
             print_error("Failed decompressing file \"%s\" to \"%s\"\n", src_file.c_str(), decomp_file);
@@ -1072,6 +1191,7 @@ int main_internal(string_array cmd_line, int num_helper_threads, ilzham &lzham_d
    };
 
    op_mode_t op_mode = OP_MODE_INVALID;
+   std::string seed_filename;
 
    for (int i = 0; i < (int)cmd_line.size(); i++)
    {
@@ -1153,11 +1273,27 @@ int main_internal(string_array cmd_line, int num_helper_threads, ilzham &lzham_d
                options.m_deterministic_parsing = true;
                break;
             }
+            case 'o':
+            {
+               options.m_tradeoff_decomp_rate_for_comp_ratio = true;
+               break;
+            }
             case 's':
             {
                int seed = atoi(str.c_str() + 2);
                srand(seed);
                printf("Using random seed: %i\n", seed);
+               break;
+            }
+            case 'a':
+            {
+               seed_filename = str.c_str() + 2;
+               if (seed_filename.empty())
+               {
+                  print_error("Must specify seed filename with -a option!\n");
+                  return EXIT_FAILURE;
+               }
+               printf("Seed filename: %s\n", seed_filename.c_str());
                break;
             }
             default:
@@ -1171,6 +1307,12 @@ int main_internal(string_array cmd_line, int num_helper_threads, ilzham &lzham_d
          i--;
 
          continue;
+      }
+
+      if ((options.m_unbuffered_decompression) && (!seed_filename.empty()))
+      {
+         print_error("Unbuffered decompression is not compatible with seed files!\n");
+         return EXIT_FAILURE;
       }
 
       if (str.size() != 1)
@@ -1236,7 +1378,7 @@ int main_internal(string_array cmd_line, int num_helper_threads, ilzham &lzham_d
          const std::string &src_file = cmd_line[0];
          const std::string &cmp_file = cmd_line[1];
 
-         bool comp_result = compress_streaming(lzham_dll, src_file.c_str(), cmp_file.c_str(), options);
+         bool comp_result = compress_file(lzham_dll, src_file.c_str(), cmp_file.c_str(), options, seed_filename.length() ? seed_filename.c_str() : NULL);
          if (comp_result)
             exit_status = EXIT_SUCCESS;
 
@@ -1249,9 +1391,9 @@ int main_internal(string_array cmd_line, int num_helper_threads, ilzham &lzham_d
 #else
             sprintf(decomp_file, "__decomp_temp_%u__.tmp", (uint)timer::get_ms());
 #endif
-            if (!decompress_file(lzham_dll, cmp_file.c_str(), decomp_file, options))
+            if (!decompress_file(lzham_dll, cmp_file.c_str(), decomp_file, options, seed_filename.length() ? seed_filename.c_str() : NULL))
             {
-               print_error("Failed decompressing file \"%s\" to \"%s\"\n", cmp_file.c_str(), decomp_file);
+               print_error("Failed decompressing file \"%s\" to \"%s\"\n", cmp_file.c_str(), decomp_file, seed_filename.length() ? seed_filename.c_str() : NULL);
                return EXIT_FAILURE;
             }
 
@@ -1284,7 +1426,7 @@ int main_internal(string_array cmd_line, int num_helper_threads, ilzham &lzham_d
             print_error("Too many filenames!\n");
             return EXIT_FAILURE;
          }
-         if (decompress_file(lzham_dll, cmd_line[0].c_str(), cmd_line[1].c_str(), options))
+         if (decompress_file(lzham_dll, cmd_line[0].c_str(), cmd_line[1].c_str(), options, seed_filename.length() ? seed_filename.c_str() : NULL))
             exit_status = EXIT_SUCCESS;
          break;
       }
@@ -1300,7 +1442,7 @@ int main_internal(string_array cmd_line, int num_helper_threads, ilzham &lzham_d
             print_error("Too many filenames!\n");
             return EXIT_FAILURE;
          }
-         if (test_recursive(lzham_dll, cmd_line[0].c_str(), options))
+         if (test_recursive(lzham_dll, cmd_line[0].c_str(), options, seed_filename.length() ? seed_filename.c_str() : NULL))
             exit_status = EXIT_SUCCESS;
          break;
       }

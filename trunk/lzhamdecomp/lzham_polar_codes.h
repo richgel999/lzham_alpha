@@ -4,7 +4,8 @@
 
 namespace lzham
 {
-   const uint cPolarMaxSupportedSyms = 600;
+   //const uint cPolarMaxSupportedSyms = 600;
+   const uint cPolarMaxSupportedSyms = 1024;
 
    uint get_generate_polar_codes_table_size();
 

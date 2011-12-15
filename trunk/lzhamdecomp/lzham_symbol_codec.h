@@ -34,16 +34,21 @@ namespace lzham
 
       void clear();
 
-      bool init(bool encoding, uint total_syms, bool fast_encoding, bool use_polar_codes);
+      bool init(bool encoding, uint total_syms, bool fast_encoding, bool use_polar_codes, const uint16 *pInitial_sym_freq = NULL);
       bool reset();
+
+      inline uint get_total_syms() const { return m_total_syms; }
 
       void rescale();
       void reset_update_rate();
 
-      inline uint get_total_syms() const { return m_total_syms; }
+      bool update(uint sym);
+
       inline bit_cost_t get_cost(uint sym) const { return m_code_sizes[sym] << cBitCostScaleShift; }
 
    public:
+      lzham::vector<uint16>            m_initial_sym_freq;
+
       lzham::vector<uint16>            m_sym_freq;
 
       lzham::vector<uint16>            m_codes;
@@ -84,11 +89,21 @@ namespace lzham
       adaptive_bit_model(float prob0);
       adaptive_bit_model(const adaptive_bit_model& other);
 
-      adaptive_bit_model& operator= (const adaptive_bit_model& rhs);
+      inline adaptive_bit_model& operator= (const adaptive_bit_model& rhs) { m_bit_0_prob = rhs.m_bit_0_prob; return *this; }
 
-      void clear();
+      inline void clear() { m_bit_0_prob  = 1U << (cSymbolCodecArithProbBits - 1); }
+
       void set_probability_0(float prob0);
-      void update(uint bit);
+
+      inline void update(uint bit)
+      {
+         if (!bit)
+            m_bit_0_prob += ((cSymbolCodecArithProbScale - m_bit_0_prob) >> cSymbolCodecArithProbMoveBits);
+         else
+            m_bit_0_prob -= (m_bit_0_prob >> cSymbolCodecArithProbMoveBits);
+         LZHAM_ASSERT(m_bit_0_prob >= 1);
+         LZHAM_ASSERT(m_bit_0_prob < cSymbolCodecArithProbScale);
+      }
 
       inline bit_cost_t get_cost(uint bit) const { return gProbCost[bit ? (cSymbolCodecArithProbScale - m_bit_0_prob) : m_bit_0_prob]; }
 
@@ -115,10 +130,14 @@ namespace lzham
       bool init(bool encoding, uint total_syms, bool fast_encoding, bool use_polar_codes = false) { fast_encoding, use_polar_codes; return init(encoding, total_syms); }
       void reset();
 
+      void reset_update_rate();
+
+      bool update(uint sym);
+
       uint get_total_syms() const { return m_total_syms; }
       bit_cost_t get_cost(uint sym) const;
 
-   private:
+   public:
       uint m_total_syms;
       typedef lzham::vector<adaptive_bit_model> adaptive_bit_model_vector;
       adaptive_bit_model_vector m_probs;
@@ -235,7 +254,8 @@ namespace lzham
       uint                    m_arith_total_bits;
 
       quasi_adaptive_huffman_data_model*     m_pSaved_huff_model;
-      adaptive_bit_model*                    m_pSaved_bit_model;
+      void*                   m_pSaved_model;
+      uint                    m_saved_node_index;
 
       bool put_bits_init(uint expected_size);
       bool record_put_bits(uint bits, uint num_bits);
@@ -318,9 +338,9 @@ namespace lzham
    pModel = &model; \
    while (LZHAM_BUILTIN_EXPECT(arith_length < cSymbolCodecArithMinLen, 0)) \
    { \
-      uint c; codec.m_pSaved_bit_model = pModel; \
+      uint c; codec.m_pSaved_model = pModel; \
       LZHAM_SYMBOL_CODEC_DECODE_GET_BITS(codec, c, 8); \
-      pModel = codec.m_pSaved_bit_model; \
+      pModel = static_cast<adaptive_bit_model*>(codec.m_pSaved_model); \
       arith_value = (arith_value << 8) | c; \
       arith_length <<= 8; \
    } \
@@ -337,6 +357,41 @@ namespace lzham
       arith_value  -= x; \
       arith_length -= x; \
    } \
+}
+
+#define LZHAM_SYMBOL_CODEC_DECODE_ADAPTIVE_ARITHMETIC(codec, result, model) \
+{ \
+   adaptive_arith_data_model *pArith_data_model; \
+   pArith_data_model = &model; \
+   uint node_index; \
+   node_index = 1; \
+   do \
+   { \
+      while (LZHAM_BUILTIN_EXPECT(arith_length < cSymbolCodecArithMinLen, 0)) \
+      { \
+         uint c; codec.m_saved_node_index = node_index; codec.m_pSaved_model = pArith_data_model; \
+         LZHAM_SYMBOL_CODEC_DECODE_GET_BITS(codec, c, 8); \
+         node_index = codec.m_saved_node_index; pArith_data_model = static_cast<adaptive_arith_data_model *>(codec.m_pSaved_model); \
+         arith_value = (arith_value << 8) | c; \
+         arith_length <<= 8; \
+      } \
+      adaptive_bit_model *pBit_model; pBit_model = &pArith_data_model->m_probs[node_index]; \
+      uint x = pBit_model->m_bit_0_prob * (arith_length >> cSymbolCodecArithProbBits); \
+      uint bit; bit = (arith_value >= x); \
+      if (!bit) \
+      { \
+         pBit_model->m_bit_0_prob += ((cSymbolCodecArithProbScale - pBit_model->m_bit_0_prob) >> cSymbolCodecArithProbMoveBits); \
+         arith_length = x; \
+      } \
+      else \
+      { \
+         pBit_model->m_bit_0_prob -= (pBit_model->m_bit_0_prob >> cSymbolCodecArithProbMoveBits); \
+         arith_value  -= x; \
+         arith_length -= x; \
+      } \
+      node_index = (node_index << 1) + bit; \
+   } while (node_index < pArith_data_model->m_total_syms); \
+   result = node_index - pArith_data_model->m_total_syms; \
 }
 
 #if LZHAM_SYMBOL_CODEC_USE_64_BIT_BUFFER
@@ -477,10 +532,14 @@ namespace lzham
    } \
 }
 
-#define LZHAM_SYMBOL_CODEC_DECODE_ARITH_START0(codec) arith_length = cSymbolCodecArithMaxLen; arith_value = 0; { uint val; LZHAM_SYMBOL_CODEC_DECODE_GET_BITS(codec, val, 8); arith_value = val << 24; }
-#define LZHAM_SYMBOL_CODEC_DECODE_ARITH_START1(codec) { uint val; LZHAM_SYMBOL_CODEC_DECODE_GET_BITS(codec, val, 8); arith_value |= (val << 16); }
-#define LZHAM_SYMBOL_CODEC_DECODE_ARITH_START2(codec) { uint val; LZHAM_SYMBOL_CODEC_DECODE_GET_BITS(codec, val, 8); arith_value |= (val << 8); }
-#define LZHAM_SYMBOL_CODEC_DECODE_ARITH_START3(codec) { uint val; LZHAM_SYMBOL_CODEC_DECODE_GET_BITS(codec, val, 8); arith_value |= val; }
+#define LZHAM_SYMBOL_CODEC_DECODE_ARITH_START(codec) \
+{ \
+   for ( arith_value = 0, arith_length = 0; arith_length < 4; ++arith_length ) \
+   { \
+      uint val; LZHAM_SYMBOL_CODEC_DECODE_GET_BITS(codec, val, 8); \
+      arith_value = (arith_value << 8) | val; \
+   } \
+   arith_length = cSymbolCodecArithMaxLen; \
+}
 
 } // namespace lzham
-

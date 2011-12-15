@@ -4,7 +4,8 @@
 
 namespace lzham
 {
-   const uint cHuffmanMaxSupportedSyms = 600;
+   //const uint cHuffmanMaxSupportedSyms = 600;
+   const uint cHuffmanMaxSupportedSyms = 1024;
    
    uint get_generate_huffman_codes_table_size();
    

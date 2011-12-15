@@ -89,6 +89,7 @@
 		<Unit filename="lzham_lzcomp.cpp" />
 		<Unit filename="lzham_lzcomp_internal.cpp" />
 		<Unit filename="lzham_lzcomp_internal.h" />
+		<Unit filename="lzham_lzcomp_state.cpp" />
 		<Unit filename="lzham_match_accel.cpp" />
 		<Unit filename="lzham_match_accel.h" />
 		<Unit filename="lzham_null_threading.h" />

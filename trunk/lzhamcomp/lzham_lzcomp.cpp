@@ -49,6 +49,15 @@ namespace lzham
       params.m_cacheline_size = pParams->m_cpucache_line_size;
       params.m_lzham_compress_flags = pParams->m_compress_flags;
       
+      if (pParams->m_num_seed_bytes)
+      {
+         if ((!pParams->m_pSeed_bytes) || (pParams->m_num_seed_bytes > (1U << pParams->m_dict_size_log2)))
+            return LZHAM_COMP_STATUS_INVALID_PARAMETER;
+
+         params.m_num_seed_bytes = pParams->m_num_seed_bytes;
+         params.m_pSeed_bytes = pParams->m_pSeed_bytes;
+      }
+      
       switch (pParams->m_level)
       {
          case LZHAM_COMP_LEVEL_FASTEST:   params.m_compression_level = cCompressionLevelFastest; break;
@@ -63,7 +72,7 @@ namespace lzham
       return LZHAM_COMP_STATUS_SUCCESS;
    }
    
-   lzham_compress_state_ptr lzham_lib_compress_init(const lzham_compress_params *pParams)
+   lzham_compress_state_ptr LZHAM_CDECL lzham_lib_compress_init(const lzham_compress_params *pParams)
    {
       if ((!pParams) || (pParams->m_struct_size != sizeof(lzham_compress_params)))   
          return NULL;
@@ -116,7 +125,7 @@ namespace lzham
       return pState;
    }
 
-   lzham_uint32 lzham_lib_compress_deinit(lzham_compress_state_ptr p)
+   lzham_uint32 LZHAM_CDECL lzham_lib_compress_deinit(lzham_compress_state_ptr p)
    {
       lzham_compress_state *pState = static_cast<lzham_compress_state *>(p);
       if (!pState)
@@ -129,7 +138,7 @@ namespace lzham
       return adler32;
    }
 
-   lzham_compress_status_t lzham_lib_compress(
+   lzham_compress_status_t LZHAM_CDECL lzham_lib_compress(
       lzham_compress_state_ptr p,
       const lzham_uint8 *pIn_buf, size_t *pIn_buf_size, 
       lzham_uint8 *pOut_buf, size_t *pOut_buf_size,
@@ -233,7 +242,7 @@ namespace lzham
       return pState->m_status;  
    }      
 
-   lzham_compress_status_t lzham_lib_compress_memory(const lzham_compress_params *pParams, lzham_uint8* pDst_buf, size_t *pDst_len, const lzham_uint8* pSrc_buf, size_t src_len, lzham_uint32 *pAdler32)
+   lzham_compress_status_t LZHAM_CDECL lzham_lib_compress_memory(const lzham_compress_params *pParams, lzham_uint8* pDst_buf, size_t *pDst_len, const lzham_uint8* pSrc_buf, size_t src_len, lzham_uint32 *pAdler32)
    {
       if ((!pParams) || (!pDst_len))
          return LZHAM_COMP_STATUS_INVALID_PARAMETER;
