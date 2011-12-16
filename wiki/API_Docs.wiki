@@ -237,7 +237,7 @@ This method may be called as many times as needed (it behaves like a coroutine),
       lzham_uint32 *pAdler32);
 }}}
 
-Compresses source data from pSrc_buf of size src_len to pDst_buf in a single call. On entry, `*`pDst_len must be the size of the destination buffer. On exit, `*`pDst_len will contain the number of bytes written to the destination buffer. `*`pAdler32 will be set to the alder32 of the source data. Same return codes as lzham_compress, except this function can also return LZHAM_COMP_STATUS_OUTPUT_BUF_TOO_SMALL.
+Compresses source data from pSrc_buf of size src_len to pDst_buf in a single call. On entry, `*`pDst_len must be the size of the destination buffer. On exit, `*`pDst_len will contain the number of bytes written to the destination buffer. `*`pAdler32 will be set to the alder32 of the source data. Same return codes as {{{lzham_compress}}}, except this function can also return LZHAM_COMP_STATUS_OUTPUT_BUF_TOO_SMALL.
 
 == Decompression ==
 === Decompression Enums ===
