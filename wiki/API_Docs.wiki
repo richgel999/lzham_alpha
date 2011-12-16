@@ -79,6 +79,8 @@ Compression requires at least dict_size+65536+dict_size*4*2+65536*4 bytes of ava
 The compressor can optionally create up to LZHAM_MAX_HELPER_THREADS "helper" threads to assist in compression. These helper threads can be used to accelerate parsing and match finding. Note, the original calling thread is NOT included in this total. For example, if the # of helper threads is 4, up to 5 threads total will be involved in compression (the calling thread plus 4 additional threads). Decompression is always single threaded.
 
 === Compression Related Enums ===
+==== lzham_compress_status_t ====
+
 {{{
    enum lzham_compress_status_t
    {
@@ -98,6 +100,7 @@ The compressor can optionally create up to LZHAM_MAX_HELPER_THREADS "helper" thr
 
 {{{lzham_compress_status_t}}} defines the possible return status codes from the compressor. The first set of codes (NOT_FINISHED and NEEDS_MORE_INPUT) indicate that the compressor can't continue because the input buffer is empty, and/or the output buffer is full. The rest of the codes indicate either a success or failure condition.
 
+==== lzham_compress_level ====
 {{{
    enum lzham_compress_level
    {
@@ -113,6 +116,7 @@ The compressor can optionally create up to LZHAM_MAX_HELPER_THREADS "helper" thr
 
 {{{lzham_compress_level}}} allows the caller to control the tradeoff between compression ratio and throughput. {{{LZHAM_COMP_LEVEL_FASTEST}}} is the fastest level with the lowest compression, and {{{LZHAM_COMP_LEVEL_UBER}}} is the slowest level with highest compression.
 
+==== lzham_compress_flags ====
 {{{
    enum lzham_compress_flags
    {
@@ -124,7 +128,7 @@ The compressor can optionally create up to LZHAM_MAX_HELPER_THREADS "helper" thr
 }}}
 
 
-{{{lzham_compress_flags} define the various flags that may be logically OR'd together:
+{{{lzham_compress_flags}}} define the various flags that may be logically OR'd together:
 
 {{{LZHAM_COMP_FLAG_FORCE_POLAR_CODING}}}: Forces Polar codes vs. Huffman, for a slight increase in decompression speed.
 
@@ -133,8 +137,41 @@ The compressor can optionally create up to LZHAM_MAX_HELPER_THREADS "helper" thr
 {{{LZHAM_COMP_FLAG_DETERMINISTIC_PARSING}}}: Guarantees that the compressed output will always be the same given the same input data, the same compression parameters, and the same build. Otherwise, the compressed output stream may vary a small amount due to kernel threading scheduling differences between runs.
 
 {{{LZHAM_COMP_FLAG_TRADEOFF_DECOMPRESSION_RATE_FOR_COMP_RATIO}}}:
-If enabled, the compressor is free to use any optimizations which could lower the decompression rate but improve ratio. For example, the compressor may adaptively reset the Huffman table update rate to maximum frequency if doing so would improve ratio, which is expensive for the decompressor.
+If enabled, the compressor is free to use any optimizations which could lower the decompression throughput rate but improve ratio. For example, the compressor may adaptively reset the Huffman table update rate to maximum frequency if doing so would improve ratio, which is expensive for the decompressor.
+
+=== Compression Parameters Struct ===
+
+{{{
+   struct lzham_compress_params
+   {
+      lzham_uint32 m_struct_size;            
+      lzham_uint32 m_dict_size_log2;         
+      lzham_compress_level m_level;          
+      lzham_uint32 m_max_helper_threads;     
+      lzham_uint32 m_cpucache_total_lines;   
+      lzham_uint32 m_cpucache_line_size;     
+      lzham_uint32 m_compress_flags;         
+      lzham_uint32 m_num_seed_bytes;         
+      const void *m_pSeed_bytes;
+   };
+}}}
+
+{{{lzham_compress_params}}} contains various initialization parameters. The caller should clear this structure to all-0's, set {{{m_struct_size}}} to sizeof(lzham_compress_params}, then fill in these parameters:
+
+{{{m_dict_size_log2}}}: Set to the log2(dictionary_size), must range between [{{{LZHAM_MIN_DICT_SIZE_LOG2}}}, {{{LZHAM_MAX_DICT_SIZE_LOG2_X86}}}] for x86 or {{{LZHAM_MAX_DICT_SIZE_LOG2_X64}}} for x64
+
+{{{m_level}}}: Compression level. Set to LZHAM_COMP_LEVEL_FASTEST, etc. See the [lzham_compress_level#lzham_compress_level] enum.
+
+{{{m_max_helper_threads}}}: Maximum # of additional "helper" threads to create, must range between [0,{{{LZHAM_MAX_HELPER_THREADS}}}]
+
+{{{m_cpucache_total_lines}}}: Set to 0 (optimize compressed stream to avoid L1/L2 cache misses - not currently supported)
+
+{{{m_cpucache_line_size}}}: Set to 0
+
+{{{m_compress_flags}}}: Optional compression flags (see lzham_compress_flags enum)
+
+{{{m_num_seed_bytes}}}: For delta compression (optional) - number of seed bytes pointed to by m_pSeed_bytes
+
+{{{m_pSeed_bytes}}}: For delta compression (optional) - pointer to seed bytes buffer, buffer must be at least m_num_seed_bytes long.
 
 == Decompression ==
-
-
