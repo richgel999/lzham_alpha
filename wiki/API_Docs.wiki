@@ -1,7 +1,5 @@
 #summary Codec API Documentation
 
-(This is a work in progress.)
-
 Applications can use LZHAM by either statically linking against two LIB's named lzhamdecomp.lib and lzhamcomp.lib, or by loading a DLL named lzham_x86.dll or lzham_x64.dll. The DLL version supports all functionality (compression/decompression).
 
 Apps that use the LIB's and don't require compression functionality only need to link with lzhamdecomp.lib. Apps that need compression functionality must link against both libs (even if decompression functionality is not needed) because the compressor depends on functionality present in the decompression lib. (The actual lib names are lib/x86/lzhamcomp_x86.lib, lib/x64/lzhamcomp_x64.lib, etc. See the {{{lib}}} directory.)
