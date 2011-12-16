@@ -212,12 +212,16 @@ This method may be called as many times as needed (it behaves like a coroutine),
 
 {{{no_more_input_bytes_flag}}}: Set to true to indicate that no more input bytes are available to compress (EOF). Once you call this function with this param set to true, it must stay set to true in all future calls.
    
-Normal return status codes:
-{{{LZHAM_COMP_STATUS_NOT_FINISHED}}}: Compression can continue, but the compressor needs more input, or it needs more room in the output buffer.
-{{{LZHAM_COMP_STATUS_NEEDS_MORE_INPUT}}}: Compression can contintue, but the compressor has no more output, and has no input but we're not at EOF. Supply more input to continue.
+==== Normal return status codes: ====
 
-Success/failure return status codes:
+{{{LZHAM_COMP_STATUS_NOT_FINISHED}}}: Compression can continue, but the compressor needs more input, or it needs more room in the output buffer.
+
+{{{LZHAM_COMP_STATUS_NEEDS_MORE_INPUT}}}: Compression can continue, but the compressor has no more output, and has no input but the caller has not indicated that we're at EOF. Supply more input to continue.
+
+==== Success/failure return status codes: ====
+
 {{{LZHAM_COMP_STATUS_SUCCESS}}}: Compression has completed successfully.
+
 {{{LZHAM_COMP_STATUS_FAILED}}}, {{{LZHAM_COMP_STATUS_FAILED_INITIALIZING}}}, {{{LZHAM_COMP_STATUS_INVALID_PARAMETER}}}: Something went wrong.
 
 ==== lzham_compress_memory ====
@@ -230,6 +234,8 @@ Success/failure return status codes:
       size_t src_len,
       lzham_uint32 *pAdler32);
 }}}
+
+Compresses source data from pSrc_buf of size src_len to pDst_buf in a single call. On entry, `*`pDst_len must be the size of the destination buffer. On exit, `*`pDst_len will contain the number of bytes written to the destination buffer. `*`pAdler32 will be set to the alder32 of the source data. Same return codes as lzham_compress, except this function can also return LZHAM_COMP_STATUS_OUTPUT_BUF_TOO_SMALL.
 
 == Decompression ==
 === Decompression Enums ===
@@ -296,16 +302,24 @@ Success/failure return status codes:
    lzham_decompress_state_ptr lzham_decompress_init(const lzham_decompress_params *pParams);
 }}}
 
+Initializes a decompressor. pParams cannot be NULL. Be sure to initialize the pParams->m_struct_size member to sizeof(lzham_decompress_params) (along with the other members to reasonable values) before calling this function.
+
+Note: With large dictionaries this function could take a while (due to memory allocation). To decompress multiple independent streams, it's faster to init a decompressor state object just one time and reuse it multiple times by calling {{{lzham_decompress_reinit()}}}.
+
 ==== lzham_decompress_reinit ====
 {{{
    lzham_decompress_state_ptr lzham_decompress_reinit(lzham_decompress_state_ptr pState, 
       const lzham_decompress_params *pParams);
 }}}
 
+Quickly re-initializes the decompressor state object to its initial state (avoiding any memory allocation/freeing unless absolutely necessary). 
+
 ==== lzham_decompress_deinit ====
 {{{
    lzham_uint32 lzham_decompress_deinit(lzham_decompress_state_ptr pState);
 }}}
+
+Deinitializes a decompressor, freeing any allocated memory associated with the state object. Returns adler32 of decompressed data if the {{{compute_adler32}}} decompression parameter was true, otherwise it returns the adler32 that was stored in the compressed stream.
 
 ==== lzham_decompress ====
 {{{
@@ -315,6 +329,22 @@ Success/failure return status codes:
       lzham_uint8 *pOut_buf, size_t *pOut_buf_size,
       lzham_bool no_more_input_bytes_flag);
 }}}
+
+Decompresses an arbitrarily sized block of compressed data, writing as much available decompressed data as possible to the output buffer. This method is implemented as a coroutine so it may be called as many times as needed. However, for best perf. try not to call it with tiny buffers.
+
+{{{pState}}}: Pointer to internal decompression state, originally created by lzham_decompress_init.
+
+{{{pIn_buf}}}, {{{pIn_buf_size}}}: Pointer to input data buffer, and a pointer to a size_t containing the number of bytes available in this buffer. On return, `*`pIn_buf_size will be set to the number of bytes actually read from the buffer, which may be 0.
+
+{{{pOut_buf}}}, {{{pOut_buf_size}}}: Pointer to the output data buffer, and a pointer to a size_t containing the max number of bytes that can be written to this buffer. On return, `*`pOut_buf_size will be set to the number of bytes written to this buffer, which may be 0.
+
+{{{no_more_input_bytes_flag}}}: Set to true to indicate that no more input bytes are available to compress (EOF). Once you call this function with this param set to true, it must stay set to true in all future calls.
+
+Notes:
+
+In unbuffered mode, the output buffer MUST be large enough to hold the entire decompressed stream. Otherwise, you'll receive the {{{LZHAM_DECOMP_STATUS_FAILED_DEST_BUF_TOO_SMALL}}} error (which is currently unrecoverable during unbuffered decompression).
+
+In buffered mode, if the output buffer's size is 0 bytes, the caller is indicating that no more output bytes are expected from the decompressor. In this case, if the decompressor actually has more bytes you'll receive the LZHAM_DECOMP_STATUS_FAILED_HAVE_MORE_OUTPUT  error (which is recoverable in the buffered case - just call {{{lzham_decompress()}}} again with a non-zero size output buffer).
 
 ==== lzham_decompress_memory ====
 {{{
@@ -326,3 +356,5 @@ Success/failure return status codes:
       size_t src_len,
       lzham_uint32 *pAdler32);
 }}}
+
+Decompresses source data from pSrc_buf of size src_len to pDst_buf in a single call. On entry, `*`pDst_len must be the size of the destination buffer. On exit, `*`pDst_len will contain the number of bytes written to the destination buffer. `*`pAdler32 will be set to the alder32 of the decompressed data. Same return codes as lzham_decompress, except this function can also return LZHAM_COMP_STATUS_OUTPUT_BUF_TOO_SMALL.
