@@ -334,7 +334,7 @@ Deinitializes a decompressor, freeing any allocated memory associated with the s
 
 Decompresses an arbitrarily sized block of compressed data, writing as much available decompressed data as possible to the output buffer. This method is implemented as a coroutine so it may be called as many times as needed. However, for best perf. try not to call it with tiny buffers.
 
-{{{pState}}}: Pointer to internal decompression state, originally created by lzham_decompress_init.
+{{{pState}}}: Pointer to internal decompression state, originally created by {{{lzham_decompress_init}}}.
 
 {{{pIn_buf}}}, {{{pIn_buf_size}}}: Pointer to input data buffer, and a pointer to a size_t containing the number of bytes available in this buffer. On return, `*`pIn_buf_size will be set to the number of bytes actually read from the buffer, which may be 0.
 
