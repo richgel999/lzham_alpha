@@ -2,17 +2,19 @@
 
 (This is a work in progress.)
 
-LZHAM can be used by statically linking the calling application against the two libraries lzhamdecomp.lib and lzhamcomp.lib, or by dynamically loading the codec as a DLL (lzham_x86.dll or lzham_x64.dll under Win32). (Note: Currently, only Win32 supports dynamic linking.) Apps that use static linking and don't require compression functionality only need to link against lzhamdecomp.lib. Apps that use static linking that need compression functionality must link against both libs (even if decompression functionality is not needed) because the compressor relies on functionality present in the decompression lib. (The actual lib names are lib/x86/lzhamcomp_x86.lib, lib/x64/lzhamcomp_x64.lib, etc. See the {{{lib}}} directory.)
+Applications can use LZHAM by either statically linking against two LIB's named lzhamdecomp.lib and lzhamcomp.lib, or by loading a DLL named lzham_x86.dll or lzham_x64.dll. The DLL version supports all functionality (compression/decompression).
 
-The public API is defined in {{{include/lzham.h}}}. This is a C-style API containing functions for streaming or single function call compression and decompression, a function to return the codec's version, and a function that allows the user to override how the codec alllocates memory. The compression/decompression functions are somewhat similar to zlib's or LZMA's. (At some point I'll be adding zlib emulation to LZHAM, using functionality present in my [http://code.google.com/p/miniz miniz] project.)
+Apps that use the LIB's and don't require compression functionality only need to link with lzhamdecomp.lib. Apps that need compression functionality must link against both libs (even if decompression functionality is not needed) because the compressor depends on functionality present in the decompression lib. (The actual lib names are lib/x86/lzhamcomp_x86.lib, lib/x64/lzhamcomp_x64.lib, etc. See the {{{lib}}} directory.)
 
-A set of strictly optional helper classes that simplify loading and using the DLL interface are defined in {{{include/lzham_dynamic_lib.h}}} and {{{include/lzham_static_lib.h}}}. 
+Alternately, the two lib structure present in the LZHAM distribution can be discarded. It may be more convienent to just copy all .cpp/.h files in the {{{include}}}, {{{lzhamcomp}}} and {{{lzhamdecomp}}} directories into a single flat directory and then compile/link these files directly into the user's application.
 
-Currently, the only working example of these API's is in the command line test app {{{lzhamtest/lzhamtest.cpp}}}.
+The entire public API is defined in the single header file {{{include/lzham.h}}}. This is a C-style API containing functions for streaming or single function call compression and decompression, a function to return the codec's version, and a function that allows the user to override how the codec alllocates memory. The compression/decompression functions are somewhat similar to zlib's or LZMA's. (At some point I'll be adding zlib emulation to LZHAM, using functionality present in my [http://code.google.com/p/miniz miniz] project.)
 
-All private LZHAM code is placed in the {{{lzham}}} namespace. All public API's begin with "lzham_".
+A set of strictly optional helper classes that simplify loading and using the DLL interface are defined in {{{include/lzham_dynamic_lib.h}}} and {{{include/lzham_static_lib.h}}}.
 
-Note: The two lib structure present in the LZHAM distribution is optional. It may be more convienent to just copy all .cpp/.h files in the {{{include}}}, {{{lzhamcomp}}} and {{{lzhamdecomp}}} directories into a single directory and then compile/link these files directly into the user's application.
+Currently, the only working example of the public API is in the command line test app {{{lzhamtest/lzhamtest.cpp}}}.
+
+All private LZHAM code is placed in the {{{lzham}}} namespace. All public API's are in the global namespace and begin with the "lzham_" prefix.
 
 == A Note on Thread Safety ==
 
@@ -181,10 +183,14 @@ If enabled, the compressor is free to use any optimizations which could lower th
    lzham_compress_state_ptr lzham_compress_init(const lzham_compress_params *pParams);
 }}}
 
+{{{lzham_compress_init}}} initializes a compressor. Returns a pointer to the compressor's internal state object, or NULL on failure. pParams cannot be NULL. Be sure to initialize the pParams->m_struct_size member to sizeof(lzham_compress_params) (along with the other members to reasonable values) before calling this function. Multiple state objects may be created.
+
 ==== lzham_compress_deinit ====
 {{{
    lzham_uint32 lzham_compress_deinit(lzham_compress_state_ptr pState);
 }}}
+
+Deinitializes a compressor, releasing all allocated memory. Returns adler32 of source data (valid only on success).
 
 ==== lzham_compress ====
 {{{
@@ -194,6 +200,25 @@ If enabled, the compressor is free to use any optimizations which could lower th
       lzham_uint8 *pOut_buf, size_t *pOut_buf_size,
       lzham_bool no_more_input_bytes_flag);
 }}}
+
+Compresses an arbitrarily sized block of data, writing as much available compressed data as possible to the output buffer. 
+This method may be called as many times as needed (it behaves like a coroutine), but for best perf. try not to call it with tiny buffers.
+
+{{{pState}}}: Pointer to internal compression state, created by {{{lzham_compress_init}}}.
+
+{{{pIn_buf}}}, {{{pIn_buf_size}}}: Pointer to input data buffer, and pointer to a size_t containing the number of bytes available in this buffer. On return, `*`pIn_buf_size will be set to the number of bytes actually read from the buffer, which may be 0.
+
+{{{pOut_buf}}}, {{{pOut_buf_size}}}: Pointer to the output data buffer, and a pointer to a size_t containing the max number of bytes that can be written to this buffer. On return, `*`pOut_buf_size will be set to the number of bytes written to this buffer, which may be 0.
+
+{{{no_more_input_bytes_flag}}}: Set to true to indicate that no more input bytes are available to compress (EOF). Once you call this function with this param set to true, it must stay set to true in all future calls.
+   
+Normal return status codes:
+{{{LZHAM_COMP_STATUS_NOT_FINISHED}}}: Compression can continue, but the compressor needs more input, or it needs more room in the output buffer.
+{{{LZHAM_COMP_STATUS_NEEDS_MORE_INPUT}}}: Compression can contintue, but the compressor has no more output, and has no input but we're not at EOF. Supply more input to continue.
+
+Success/failure return status codes:
+{{{LZHAM_COMP_STATUS_SUCCESS}}}: Compression has completed successfully.
+{{{LZHAM_COMP_STATUS_FAILED}}}, {{{LZHAM_COMP_STATUS_FAILED_INITIALIZING}}}, {{{LZHAM_COMP_STATUS_INVALID_PARAMETER}}}: Something went wrong.
 
 ==== lzham_compress_memory ====
 {{{
@@ -207,9 +232,7 @@ If enabled, the compressor is free to use any optimizations which could lower th
 }}}
 
 == Decompression ==
-
 === Decompression Enums ===
-
 ==== lzham_decompress_status_t ====
 {{{
    enum lzham_decompress_status_t
@@ -236,6 +259,36 @@ If enabled, the compressor is free to use any optimizations which could lower th
    };
 }}}
 
+{{{lzham_decompress_status_t}}} defines the possible return status codes from the decompressor. The first set of codes (NOT_FINISHED and NEEDS_MORE_INPUT) indicate that the decompressor can't continue because the input buffer is empty, and/or the output buffer is full. The rest of the codes indicate either a success or failure condition.
+
+=== Decompression Parameters Struct ===
+==== lzham_decompress_params ====
+{{{
+   struct lzham_decompress_params
+   {
+      lzham_uint32 m_struct_size;            
+      lzham_uint32 m_dict_size_log2;         
+      lzham_bool m_output_unbuffered;        
+      lzham_bool m_compute_adler32;          
+      lzham_uint32 m_num_seed_bytes;         
+      const void *m_pSeed_bytes;        
+   };
+}}}
+
+{{{lzham_decompress_params}}} contains various initialization parameters. The caller should clear this structure to all-0's, set {{{m_struct_size}}} to sizeof(lzham_decompress_params}, then fill in these parameters:
+
+{{{m_struct_size}}}: Set to sizeof(lzham_decompress_params)
+
+{{{m_dict_size_log2}}}: Set to the log2(dictionary_size), must range between [LZHAM_MIN_DICT_SIZE_LOG2, LZHAM_MAX_DICT_SIZE_LOG2_X86] for x86 LZHAM_MAX_DICT_SIZE_LOG2_X64 for x64. See [API_Docs#Important_Macros Important Macros].
+
+{{{m_output_unbuffered}}}: Set to true if the output buffer is guaranteed to be large enough to hold the entire output stream (a bit faster)
+
+{{{m_compute_adler32}}}: Set to true to enable adler32 checking during decompression (slightly slower)
+
+{{{m_num_seed_bytes}}}: Optional, for delta compression - number of seed bytes pointed to by m_pSeed_bytes
+
+{{{m_pSeed_bytes}}}: Optional, for delta compression - pointer to seed bytes buffer, must be at least m_num_seed_bytes long
+
 === Decompression Functions ===
 
 ==== lzham_decompress_init ====
@@ -253,7 +306,6 @@ If enabled, the compressor is free to use any optimizations which could lower th
 {{{
    lzham_uint32 lzham_decompress_deinit(lzham_decompress_state_ptr pState);
 }}}
-
 
 ==== lzham_decompress ====
 {{{
