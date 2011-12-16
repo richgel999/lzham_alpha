@@ -59,7 +59,7 @@ Otherwise, the caller wants to attempt to change the size of the block pointed t
 
 If {{{pActual_size}}} is not NULL, {{{*pActual_size}}} should be set to the actual size of the returned block. 
 
-For an example implemention, see the default function {{{lzham_default_realloc}}} in lzhamdecomp/lzham_mem.cpp.
+For an example implemention, see the function {{{lzham_default_realloc}}} in lzhamdecomp/lzham_mem.cpp.
 
 === msize callback ===
 
