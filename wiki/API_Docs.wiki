@@ -346,7 +346,7 @@ Notes:
 
 In unbuffered mode, the output buffer MUST be large enough to hold the entire decompressed stream. Otherwise, you'll receive the {{{LZHAM_DECOMP_STATUS_FAILED_DEST_BUF_TOO_SMALL}}} error (which is currently unrecoverable during unbuffered decompression).
 
-In buffered mode, if the output buffer's size is 0 bytes, the caller is indicating that no more output bytes are expected from the decompressor. In this case, if the decompressor actually has more bytes you'll receive the LZHAM_DECOMP_STATUS_FAILED_HAVE_MORE_OUTPUT  error (which is recoverable in the buffered case - just call {{{lzham_decompress()}}} again with a non-zero size output buffer).
+In buffered mode, if the caller indicates the output buffer's size is 0 bytes, the caller is indicating that no more output bytes are expected from the decompressor. In this case, if the decompressor actually has more bytes available you'll receive the LZHAM_DECOMP_STATUS_FAILED_HAVE_MORE_OUTPUT error (which is recoverable in the buffered case - just call {{{lzham_decompress()}}} again with a non-zero size output buffer).
 
 ==== lzham_decompress_memory ====
 {{{
