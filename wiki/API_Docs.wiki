@@ -359,4 +359,4 @@ In buffered mode, if the caller indicates the output buffer's size is 0 bytes, t
       lzham_uint32 *pAdler32);
 }}}
 
-Decompresses source data from pSrc_buf of size src_len to pDst_buf in a single call. On entry, `*`pDst_len must be the size of the destination buffer. On exit, `*`pDst_len will be set to the number of bytes written to the destination buffer. `*`pAdler32 will be set to the alder32 of the decompressed data. Same return codes as {{{lzham_decompress}}}, except this function can also return LZHAM_DECOMP_STATUS_FAILED_DEST_BUF_TOO_SMALL.
+Decompresses source data from pSrc_buf of size src_len to pDst_buf in a single call. On entry, `*`pDst_len must be set to the size of the destination buffer. On exit, `*`pDst_len will be set to the actual number of bytes written to the destination buffer. `*`pAdler32 will be set to the alder32 of the decompressed data. Same return codes as {{{lzham_decompress}}}, except this function can also return LZHAM_DECOMP_STATUS_FAILED_DEST_BUF_TOO_SMALL.
