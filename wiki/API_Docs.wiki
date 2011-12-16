@@ -57,7 +57,7 @@ If {{{p}}} is not NULL but {{{size}}} is 0, the caller wants to free the block p
 
 Otherwise, the caller wants to attempt to change the size of the block pointed to by {{{p}}}. In this case, if {{{movable}}} is true, it is acceptable to physically move the block to satisfy the reallocation request. If {{{movable}}} is false, the block *must not* be moved. NULL is returned if reallocation fails for any reason. In this case, the original allocated block must remain allocated.
 
-If {{{pActual_size}}} is not NULL, {{{*pActual_size}}} should be set to the actual size of the returned block. See the default function {{{lzham_default_realloc}}} in lzhamdecomp/lzham_mem.cpp for a working example.
+If {{{pActual_size}}} is not NULL, {{{*pActual_size}}} should be set to the actual size of the returned block. For an example implemention, see the default function {{{lzham_default_realloc}}} in lzhamdecomp/lzham_mem.cpp.
 
 === msize callback ===
 
