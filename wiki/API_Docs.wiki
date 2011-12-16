@@ -319,7 +319,7 @@ Quickly re-initializes the decompressor state object to its initial state (avoid
    lzham_uint32 lzham_decompress_deinit(lzham_decompress_state_ptr pState);
 }}}
 
-Deinitializes a decompressor, freeing any allocated memory associated with the state object. Returns adler32 of decompressed data if the {{{compute_adler32}}} decompression parameter was true, otherwise it returns the adler32 that was stored in the compressed stream.
+Deinitializes a decompressor, freeing any allocated memory associated with the state object. Returns adler32 of decompressed data if the {{{compute_adler32}}} decompression parameter was true, otherwise it returns the adler32 of the source (uncompressed) data that was read from the compressed data stream.
 
 ==== lzham_decompress ====
 {{{
@@ -357,4 +357,4 @@ In buffered mode, if the output buffer's size is 0 bytes, the caller is indicati
       lzham_uint32 *pAdler32);
 }}}
 
-Decompresses source data from pSrc_buf of size src_len to pDst_buf in a single call. On entry, `*`pDst_len must be the size of the destination buffer. On exit, `*`pDst_len will contain the number of bytes written to the destination buffer. `*`pAdler32 will be set to the alder32 of the decompressed data. Same return codes as lzham_decompress, except this function can also return LZHAM_COMP_STATUS_OUTPUT_BUF_TOO_SMALL.
+Decompresses source data from pSrc_buf of size src_len to pDst_buf in a single call. On entry, `*`pDst_len must be the size of the destination buffer. On exit, `*`pDst_len will be set to the number of bytes written to the destination buffer. `*`pAdler32 will be set to the alder32 of the decompressed data. Same return codes as {{{lzham_decompress}}}, except this function can also return LZHAM_DECOMP_STATUS_FAILED_DEST_BUF_TOO_SMALL.
