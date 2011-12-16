@@ -160,7 +160,7 @@ If enabled, the compressor is free to use any optimizations which could lower th
 
 {{{m_dict_size_log2}}}: Set to the log2(dictionary_size), must range between [{{{LZHAM_MIN_DICT_SIZE_LOG2}}}, {{{LZHAM_MAX_DICT_SIZE_LOG2_X86}}}] for x86 or {{{LZHAM_MAX_DICT_SIZE_LOG2_X64}}} for x64
 
-{{{m_level}}}: Compression level. Set to LZHAM_COMP_LEVEL_FASTEST, etc. See the [lzham_compress_level#lzham_compress_level] enum.
+{{{m_level}}}: Compression level. Set to LZHAM_COMP_LEVEL_FASTEST, etc. See the [API_Docs#lzham_compress_level] enum.
 
 {{{m_max_helper_threads}}}: Maximum # of additional "helper" threads to create, must range between [0,{{{LZHAM_MAX_HELPER_THREADS}}}]
 
