@@ -12,7 +12,7 @@ Currently, the only working example of these API's is in the command line test a
 
 All private LZHAM code is placed in the {{{lzham}}} namespace. All public API's begin with "lzham_".
 
-Note: The two lib structure present in the LZHAM distribution is optional. It may be more convienent to just copy all .cpp/.h files in the {{{include}}}, {{{lzhamcomp}}} and {{{lzhamdecomp}}} directories into a single directory, and then compile/link these files directly into the user's application.
+Note: The two lib structure present in the LZHAM distribution is optional. It may be more convienent to just copy all .cpp/.h files in the {{{include}}}, {{{lzhamcomp}}} and {{{lzhamdecomp}}} directories into a single directory and then compile/link these files directly into the user's application.
 
 == A Note on Thread Safety ==
 
@@ -45,12 +45,96 @@ By default, the codec calls the usual C-API's to manage memory ({{{malloc}}}, {{
 
 Avoid calling this function if there are any currently active compression/decompression state objects. This function is not thread safe.
 
-The custom realloc and msize functions must be implemented in a thread safe manner -- they can be called from multiple threads when threaded compression is enabled.
+The custom realloc and msize functions must be implemented in a thread safe manner. These functions can be called from multiple threads when threaded compression is enabled.
 
-=== realloc ===
+=== realloc callback ===
 
-The custom reallocation function callback {{{lzham_realloc_func}}} must examine its input parameters to determine the caller's actual intent. If the input pointer {{{p}}} is NULL, the caller wants to allocate a block which must be at least as large as {{{size}}}. NULL is returned if the allocation fails. If {{{p}}} is not NULL but {{{size}}} is 0, the caller wants to free the block pointed to by {{{p}}}. Otherwise, the caller wants to attempt to change the size of the block pointed to by {{{p}}}. In this case, if {{{movable}}} is true, it is acceptable to physically move the block to satisfy the reallocation request. If {{{movable}}} is false, the block *must not* be moved. NULL is returned if reallocation fails for any reason. If {{{pActual_size}}} is not NULL, {{{*pActual_size}}} should be set to the actual size of the returned block. See the default function {{{lzham_default_realloc}}} in lzhamdecomp/lzham_mem.cpp for a working example.
+The custom reallocation function callback {{{lzham_realloc_func}}} must examine its input parameters to determine the caller's actual intent. If the input pointer {{{p}}} is NULL, the caller wants to allocate a block which must be at least as large as {{{size}}}. NULL is returned if the allocation fails. 
 
-=== msize ===
+If {{{p}}} is not NULL but {{{size}}} is 0, the caller wants to free the block pointed to by {{{p}}}. 
+
+Otherwise, the caller wants to attempt to change the size of the block pointed to by {{{p}}}. In this case, if {{{movable}}} is true, it is acceptable to physically move the block to satisfy the reallocation request. If {{{movable}}} is false, the block *must not* be moved. NULL is returned if reallocation fails for any reason. In this case, the original allocated block must remain allocated.
+
+If {{{pActual_size}}} is not NULL, {{{*pActual_size}}} should be set to the actual size of the returned block. See the default function {{{lzham_default_realloc}}} in lzhamdecomp/lzham_mem.cpp for a working example.
+
+=== msize callback ===
 
 The custom memory size callback {{{lzham_msize_func}}} must return the actual size of the allocated block pointed to by {{{p}}}, or 0 if {{{p}}} is NULL. The default implementation just calls {{{_msize}}}.
+
+== Compression ==
+
+=== Important Macros ===
+{{{
+   #define LZHAM_MIN_DICT_SIZE_LOG2 15
+   #define LZHAM_MAX_DICT_SIZE_LOG2_X86 26
+   #define LZHAM_MAX_DICT_SIZE_LOG2_X64 29
+}}}
+
+Compression requires at least dict_size+65536+dict_size*4*2+65536*4 bytes of available heap memory. Under x86, the maximum supported dictionary size is 2^26^ (64MB), and under x64 the maximum is currently 2^29^ (512MB). The minimum supported dictionary size is 32KB, but note the codec hasn't really been tuned for max throughput or coding efficiency with tiny dictionary sizes.
+
+{{{
+   #define LZHAM_MAX_HELPER_THREADS 16
+}}}
+
+The compressor can optionally create up to LZHAM_MAX_HELPER_THREADS "helper" threads to assist in compression. These helper threads can be used to accelerate parsing and match finding. Note, the original calling thread is NOT included in this total. For example, if the # of helper threads is 4, up to 5 threads total will be involved in compression (the calling thread plus 4 additional threads). Decompression is always single threaded.
+
+=== Compression Related Enums ===
+{{{
+   enum lzham_compress_status_t
+   {
+      LZHAM_COMP_STATUS_NOT_FINISHED = 0,
+      LZHAM_COMP_STATUS_NEEDS_MORE_INPUT,
+
+      // All the following enums must indicate failure/success.
+      LZHAM_COMP_STATUS_FIRST_SUCCESS_OR_FAILURE_CODE,
+
+      LZHAM_COMP_STATUS_SUCCESS = LZHAM_COMP_STATUS_FIRST_SUCCESS_OR_FAILURE_CODE,
+      LZHAM_COMP_STATUS_FAILED,
+      LZHAM_COMP_STATUS_FAILED_INITIALIZING,
+      LZHAM_COMP_STATUS_INVALID_PARAMETER,
+      LZHAM_COMP_STATUS_OUTPUT_BUF_TOO_SMALL
+   };
+}}}
+
+{{{lzham_compress_status_t}}} defines the possible return status codes from the compressor. The first set of codes (NOT_FINISHED and NEEDS_MORE_INPUT) indicate that the compressor can't continue because the input buffer is empty, and/or the output buffer is full. The rest of the codes indicate either a success or failure condition.
+
+{{{
+   enum lzham_compress_level
+   {
+      LZHAM_COMP_LEVEL_FASTEST = 0,
+      LZHAM_COMP_LEVEL_FASTER,
+      LZHAM_COMP_LEVEL_DEFAULT,
+      LZHAM_COMP_LEVEL_BETTER,
+      LZHAM_COMP_LEVEL_UBER,
+
+      LZHAM_TOTAL_COMP_LEVELS
+   };
+}}}
+
+{{{lzham_compress_level}}} allows the caller to control the tradeoff between compression ratio and throughput. {{{LZHAM_COMP_LEVEL_FASTEST}}} is the fastest level with the lowest compression, and {{{LZHAM_COMP_LEVEL_UBER}}} is the slowest level with highest compression.
+
+{{{
+   enum lzham_compress_flags
+   {
+      LZHAM_COMP_FLAG_FORCE_POLAR_CODING = 1,      
+      LZHAM_COMP_FLAG_EXTREME_PARSING = 2,         
+      LZHAM_COMP_FLAG_DETERMINISTIC_PARSING = 4,   
+      LZHAM_COMP_FLAG_TRADEOFF_DECOMPRESSION_RATE_FOR_COMP_RATIO = 16,
+   };
+}}}
+
+
+{{{lzham_compress_flags} define the various flags that may be logically OR'd together:
+
+{{{LZHAM_COMP_FLAG_FORCE_POLAR_CODING}}}: Forces Polar codes vs. Huffman, for a slight increase in decompression speed.
+
+{{{LZHAM_COMP_FLAG_EXTREME_PARSING}}}: Improves ratio by allowing the compressor's parse graph to grow "higher" (up to 4 parent nodes per output node), but is much slower.
+
+{{{LZHAM_COMP_FLAG_DETERMINISTIC_PARSING}}}: Guarantees that the compressed output will always be the same given the same input data, the same compression parameters, and the same build. Otherwise, the compressed output stream may vary a small amount due to kernel threading scheduling differences between runs.
+
+{{{LZHAM_COMP_FLAG_TRADEOFF_DECOMPRESSION_RATE_FOR_COMP_RATIO}}}:
+If enabled, the compressor is free to use any optimizations which could lower the decompression rate but improve ratio. For example, the compressor may adaptively reset the Huffman table update rate to maximum frequency if doing so would improve ratio, which is expensive for the decompressor.
+
+== Decompression ==
+
+
