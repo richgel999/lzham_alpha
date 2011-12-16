@@ -6,7 +6,7 @@ The DLL version supports both compression/decompression. Apps that use the LIB's
 
 Alternately, the two lib structure present in the LZHAM distribution can be discarded. It may be more convienent to just copy all .cpp/.h files in the {{{include}}}, {{{lzhamcomp}}} and {{{lzhamdecomp}}} directories into a single flat directory and then compile/link these files directly into the user's application.
 
-The entire public API is defined in the single header file {{{include/lzham.h}}}. This is a C-style API containing functions for streaming or single function call compression and decompression, a function to return the codec's version, and a function that allows the user to override how the codec alllocates memory. The compression/decompression functions are somewhat similar to zlib's or LZMA's. (At some point I'll be adding zlib emulation to LZHAM, using functionality present in my [http://code.google.com/p/miniz miniz] project.)
+The entire public API is defined in the single header file {{{include/lzham.h}}}. This is a C-style API containing functions for streaming or single function call compression and decompression, a function to return the codec's version, and a function that allows the user to override how the codec alllocates memory. The compression/decompression functions are somewhat similar to zlib's or LZMA's. 
 
 A set of strictly optional helper classes that simplify loading and using the DLL interface are defined in {{{include/lzham_dynamic_lib.h}}} and {{{include/lzham_static_lib.h}}}.
 
