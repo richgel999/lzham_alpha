@@ -306,7 +306,7 @@ Compresses source data from pSrc_buf of size src_len to pDst_buf in a single cal
 
 Initializes a decompressor. pParams cannot be NULL. Be sure to initialize the pParams->m_struct_size member to sizeof(lzham_decompress_params) (along with the other members to reasonable values) before calling this function.
 
-Note: With large dictionaries this function could take a while (due to memory allocation). To decompress multiple independent streams, it's faster to init a decompressor state object just one time and reuse it multiple times by calling {{{lzham_decompress_reinit()}}}.
+Note: With large dictionaries this function could take a while (due to memory allocation). To decompress multiple independent streams, it's faster to init a decompressor state object just one time, use it, then reuse it multiple times as needed by calling {{{lzham_decompress_reinit()}}}.
 
 ==== lzham_decompress_reinit ====
 {{{
