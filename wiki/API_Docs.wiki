@@ -12,7 +12,7 @@ A set of strictly optional helper classes that simplify loading and using the DL
 
 Currently, the only working example of the public API is in the command line test app {{{lzhamtest/lzhamtest.cpp}}}.
 
-All private LZHAM code is placed in the {{{lzham}}} namespace. All public API's are in the global namespace and begin with the "lzham__" prefix.
+All private LZHAM code is placed in the {{{lzham}}} namespace. All public API's are in the global namespace and begin with the {{{"lzham_"}}} prefix.
 
 == A Note on Thread Safety ==
 
@@ -46,6 +46,8 @@ By default, the codec calls the usual C-API's to manage memory ({{{malloc}}}, {{
 Avoid calling this function if there are any currently active compression/decompression state objects. This function is not thread safe.
 
 The custom realloc and msize functions must be implemented in a thread safe manner. These functions can be called from multiple threads when threaded compression is enabled.
+
+All block pointers returned by the realloc callback must be aligned to at least {{{LZHAM_MIN_ALLOC_ALIGNMENT}}} bytes.
 
 === realloc callback ===
 
