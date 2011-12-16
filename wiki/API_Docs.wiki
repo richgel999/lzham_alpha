@@ -63,7 +63,7 @@ For an example implemention, see the default function {{{lzham_default_realloc}}
 
 === msize callback ===
 
-The custom memory size callback {{{lzham_msize_func}}} must return the actual size of the allocated block pointed to by {{{p}}}, or 0 if {{{p}}} is NULL. The default implementation just calls {{{_msize}}}.
+The custom memory size callback {{{lzham_msize_func}}} must return the actual size of the allocated block pointed to by {{{p}}}, or 0 if {{{p}}} is NULL. The default implementation in lzhamdecomp/lzham_mem.cpp just calls {{{_msize}}}.
 
 == Compression ==
 
