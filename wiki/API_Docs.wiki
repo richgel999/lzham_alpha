@@ -340,7 +340,7 @@ Decompresses an arbitrarily sized block of compressed data, writing as much avai
 
 {{{pOut_buf}}}, {{{pOut_buf_size}}}: Pointer to the output data buffer, and a pointer to a size_t containing the max number of bytes that can be written to this buffer. On return, `*`pOut_buf_size will be set to the number of bytes written to this buffer, which may be 0.
 
-{{{no_more_input_bytes_flag}}}: Set to true to indicate that no more input bytes are available to compress (EOF). Once you call this function with this param set to true, it must stay set to true in all future calls.
+{{{no_more_input_bytes_flag}}}: Set to true to indicate that no more input bytes are available to compress (EOF). Once you call this function with this param set to true, it must remain set to true in all future calls.
 
 Notes:
 
