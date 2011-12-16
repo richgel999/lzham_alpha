@@ -1,0 +1,54 @@
+#summary Codec API Documentation
+
+LZHAM can be used by statically linking the calling application against the two libraries lzhamdecomp.lib and lzhamcomp.lib, or by dynamically loading the codec as a DLL (lzham_x86.dll or lzham_x64.dll under Win32). (Note: Currently, only Win32 supports dynamic linking.) Apps that use static linking and don't require compression functionality only need to link against lzhamdecomp.lib. Apps that use static linking that need compression functionality must link against both libs (even if decompression functionality is not needed) because the compressor relies on functionality present in the decompression lib. (The actual lib names are lib/x86/lzhamcomp_x86.lib, lib/x64/lzhamcomp_x64.lib, etc. See the {{{lib}}} directory.)
+
+The public API is defined in {{{include/lzham.h}}}. This is a C-style API containing functions for streaming or single function call compression and decompression, a function to return the codec's version, and a function that allows the user to override how the codec alllocates memory. The compression/decompression functions are somewhat similar to zlib's or LZMA's. (At some point I'll be adding zlib emulation to LZHAM, using functionality present in my [http://code.google.com/p/miniz miniz project.)
+
+A set of strictly optional helper classes that simplify loading and using the DLL interface are defined in {{{include/lzham_dynamic_lib.h}}} and {{{include/lzham_static_lib.h}}}. 
+
+Currently, the only working example of these API's is in the command line test app {{{lzhamtest/lzhamtest.cpp}}}.
+
+All private LZHAM code is placed in the {{{lzham}}} namespace. All public API's begin with "lzham_".
+
+Note: The two lib structure present in the LZHAM distribution is optional. It may be more convienent to just copy all .cpp/.h files in the {{{include}}}, {{{lzhamcomp}}} and {{{lzhamdecomp}}} directories into a single directory, and then compile/link these files directly into the user's application.
+
+== A Note on Thread Safety ==
+
+All codec state (excluding the memory allocation callback functions, which are global pointers) is stored within user-managed compression/decompression state objects (created by {{{lzham_compress_init()}}} or {{{lzham_decompress_init()}}}), so the codec is thread safe (i.e. multiple compressors/decompressors may be active simultaneously on _different_ state objects). 
+
+However, on a single state object, the compression/decompression API's are not thread safe (i.e. the API's don't do any locking for you at the state object level). In other words, don't do something like calling {{{lzham_compress()}}} simultaneously from multiple threads on the _same_ state object - bad things will happen. 
+
+= API Categories =
+
+== Versioning ==
+
+{{{
+   lzham_uint32 lzham_get_version(void);
+}}}
+
+Returns the codec's version. The high byte contains the major version (currently 0x10), and the low byte contains the minor version (0x07 in the alpha7 release).
+
+== Custom Memory Allocation Callbacks ==
+
+{{{
+   #define LZHAM_MIN_ALLOC_ALIGNMENT sizeof(size_t) * 2
+
+   typedef void*  (*lzham_realloc_func)(void* p, size_t size, size_t* pActual_size, bool movable, void* pUser_data);
+   typedef size_t (*lzham_msize_func)(void* p, void* pUser_data);
+
+   void lzham_set_memory_callbacks(lzham_realloc_func pRealloc, lzham_msize_func pMSize, void* pUser_data);
+}}}
+
+By default, the codec calls the usual C-API's to manage memory ({{{malloc}}}, {{{realloc}}}, {{{free}}}, etc.). Call {{{lzham_set_memory_callbacks}}} to globally override this behavior. The user must implement two callbacks, one to handle block allocation/reallocation/freeing, and another that returns the size of allocated blocks.
+
+Avoid calling this function if there are any currently active compression/decompression state objects. This function is not thread safe.
+
+The custom realloc and msize functions must be implemented in a thread safe manner -- they can be called from multiple threads when threaded compression is enabled.
+
+=== realloc ===
+
+The custom reallocation function callback {{{lzham_realloc_func}}} must examine its input parameters to determine the caller's actual intent. If the input pointer {{{p}}} is NULL, the caller wants to allocate a block which must be at least as large as {{{size}}}. NULL is returned if the allocation fails. If {{{p}}} is not NULL but {{{size}}} is 0, the caller wants to free the block pointed to by {{{p}}}. Otherwise, the caller wants to attempt to change the size of the block pointed to by {{{p}}}. In this case, if {{{movable}}} is true, it is acceptable to physically move the block to satisfy the reallocation request. If {{{movable}}} is false, the block *must not* be moved. NULL is returned if reallocation fails for any reason. If {{{pActual_size}}} is not NULL, {{{*pActual_size}}} should be set to the actual size of the returned block. See the default function {{{lzham_default_realloc}}} in lzhamdecomp/lzham_mem.cpp for a working example.
+
+=== msize ===
+
+The custom memory size callback {{{lzham_msize_func}}} must return the actual size of the allocated block pointed to by {{{p}}}, or 0 if {{{p}}} is NULL. The default implementation just calls {{{_msize}}}.
