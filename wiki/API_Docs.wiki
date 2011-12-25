@@ -354,7 +354,7 @@ Notes:
 
 In unbuffered mode, the output buffer *must* be large enough to hold the entire decompressed stream. Otherwise, you'll receive the {{{LZHAM_DECOMP_STATUS_FAILED_DEST_BUF_TOO_SMALL}}} error (which is currently unrecoverable during unbuffered decompression).
 
-In buffered mode, if the caller indicates the output buffer's size is 0 bytes, the caller is indicating that no more output bytes are expected from the decompressor. In this case, if the decompressor actually has more bytes available you'll receive the LZHAM_DECOMP_STATUS_FAILED_HAVE_MORE_OUTPUT error (which is recoverable in the buffered case - just call {{{lzham_decompress()}}} again with a non-zero size output buffer).
+In buffered mode, if the caller indicates the output buffer's size is 0 bytes, the caller is indicating that no more output bytes are expected from the decompressor. In this case, if the decompressor actually has more bytes available you'll receive the {{{LZHAM_DECOMP_STATUS_FAILED_HAVE_MORE_OUTPUT}}} error (which is recoverable in the buffered case - just call {{{lzham_decompress()}}} again with a non-zero size output buffer).
 
 ==== lzham_decompress_memory ====
 {{{
@@ -367,4 +367,4 @@ In buffered mode, if the caller indicates the output buffer's size is 0 bytes, t
       lzham_uint32 *pAdler32);
 }}}
 
-Decompresses source data from pSrc_buf of size src_len to pDst_buf in a single call. On entry, `*`pDst_len must be set to the size of the destination buffer. On exit, `*`pDst_len will be set to the actual number of bytes written to the destination buffer. `*`pAdler32 will be set to the alder32 of the decompressed data. Same return codes as {{{lzham_decompress}}}, except this function can also return LZHAM_DECOMP_STATUS_FAILED_DEST_BUF_TOO_SMALL.
+Decompresses source data from pSrc_buf of size src_len to pDst_buf in a single call. On entry, `*`pDst_len must be set to the size of the destination buffer. On exit, `*`pDst_len will be set to the actual number of bytes written to the destination buffer. `*`pAdler32 will be set to the alder32 of the decompressed data. Same return codes as {{{lzham_decompress}}}, except this function can also return {{{LZHAM_DECOMP_STATUS_FAILED_DEST_BUF_TOO_SMALL}}}.
