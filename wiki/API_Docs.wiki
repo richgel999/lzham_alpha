@@ -28,6 +28,12 @@ All codec state (excluding the memory allocation callback functions, which are g
 
 However, on a single state object, the compression/decompression API's are not thread safe (i.e. the API's don't do any locking for you at the state object level). In other words, don't do something like calling {{{lzham_compress()}}} simultaneously from multiple threads on the _same_ state object - bad things will happen. 
 
+= Configuration = 
+
+The header file {{{lzhamdecomp/lzham_core.h}}} configures both the decompressor and compressor. The lib has been tested under Windows (x86 and x64 using VS 2008 and VS 2010), TDM GCC x86/x64, and under 32-bit Ubuntu Linux. Mac/BSD support isn't there yet, but it's on the radar.
+
+The codec can be compiled under plain vanilla ANSI C/C++ by defining the {{{LZHAM_ANSI_CPLUSPLUS}}} macro in {{{lzham_core.h}}}. This shouldn't have a big impact on decompression, but this unfortunately disables all threading and atomic operations in the compressor.
+
 = API Categories =
 
 == Versioning ==
