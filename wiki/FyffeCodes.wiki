@@ -1,5 +1,4 @@
 #summary Fyffe Codes for Fast Codelength Approximation
-#labels Featured
 
 = Introduction =
 
