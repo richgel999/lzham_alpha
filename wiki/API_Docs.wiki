@@ -1,4 +1,5 @@
 #summary Codec API Documentation
+#labels Featured
 
 = LZHAM Codec Reference =
 
