@@ -1,5 +1,4 @@
 #summary Detailed version release history
-#labels Featured
 
 *Alpha6 Changes*
 
