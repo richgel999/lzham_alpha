@@ -9,6 +9,8 @@ The DLL version supports both compression/decompression. Apps that use the LIB's
 
 Alternately, the two lib structure present in the LZHAM distribution can be discarded. It may be more convienent to just copy all .cpp/.h files in the {{{include}}}, {{{lzhamcomp}}} and {{{lzhamdecomp}}} directories into a single flat directory and then compile/link these files directly into the user's application.
 
+----
+
 == Public API ==
 
 The entire public API is defined in the single header file {{{include/lzham.h}}}. This is a C-style API containing functions for streaming compression/decompression, single function call compression/decompression, a function to return the codec's version, and a function that allows the user to override how the codec alllocates memory. The compression/decompression functions are somewhat similar to zlib's or LZMA's. 
@@ -19,9 +21,13 @@ Currently, the only working example of the public API is in the command line tes
 
 All private LZHAM code is placed in the {{{lzham}}} namespace. All public API's are in the global namespace and begin with the {{{"lzham_"}}} prefix.
 
+----
+
 == C++ Features ==
 
 The codec is currently written in C++, but it only uses a subset of the full language: no exceptions, no multiple inheritance, no calls to new/delete, and very few virtuals. All memory allocation can be overriden by the user. A few templates are used, but (hopefully) in easily understood ways. (As time permits, LZHAM will be ported to C.)
+
+----
 
 == Thread Safety ==
 
@@ -29,11 +35,15 @@ All codec state (excluding the memory allocation callback functions, which are g
 
 However, on a single state object, the compression/decompression API's are not thread safe (i.e. the API's don't do any locking for you at the state object level). In other words, don't do something like calling {{{lzham_compress()}}} simultaneously from multiple threads on the _same_ state object - bad things will happen. 
 
+----
+
 = Configuration = 
 
 The header file {{{lzhamdecomp/lzham_core.h}}} configures both the decompressor and compressor. The lib has been tested under Windows (x86 and x64 using VS 2008 and VS 2010), TDM GCC x86/x64, and under 32-bit Ubuntu Linux. Mac/BSD support isn't there yet, but it's on the radar.
 
 The codec can be compiled under plain vanilla ANSI C/C++ by defining the {{{LZHAM_ANSI_CPLUSPLUS}}} macro in {{{lzham_core.h}}}. This shouldn't have a big impact on decompression, but this unfortunately disables all threading and atomic operations in the compressor.
+
+----
 
 = API Categories =
 
