@@ -23,4 +23,15 @@ namespace lzham
       lzham_uint8* pDst_buf, size_t *pDst_len, 
       const lzham_uint8* pSrc_buf, size_t src_len, lzham_uint32 *pAdler32);
 
+   int LZHAM_CDECL lzham_lib_z_inflateInit2(lzham_z_streamp pStream, int window_bits);
+   int LZHAM_CDECL lzham_lib_z_inflateInit(lzham_z_streamp pStream);
+   int LZHAM_CDECL lzham_lib_z_inflateReset(lzham_z_streamp pStream);
+   int LZHAM_CDECL lzham_lib_z_inflate(lzham_z_streamp pStream, int flush);
+   int LZHAM_CDECL lzham_lib_z_inflateEnd(lzham_z_streamp pStream);
+   int LZHAM_CDECL lzham_lib_z_uncompress(unsigned char *pDest, lzham_z_ulong *pDest_len, const unsigned char *pSource, lzham_z_ulong source_len);
+
+   const char * LZHAM_CDECL lzham_lib_z_error(int err);
+   lzham_z_ulong lzham_lib_z_adler32(lzham_z_ulong adler, const unsigned char *ptr, size_t buf_len);
+   lzham_z_ulong LZHAM_CDECL lzham_lib_z_crc32(lzham_z_ulong crc, const lzham_uint8 *ptr, size_t buf_len);
+
 } // namespace lzham

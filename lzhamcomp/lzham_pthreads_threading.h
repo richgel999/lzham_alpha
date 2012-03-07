@@ -375,6 +375,9 @@ namespace lzham
 #endif
    }
 
+   // TODO: Implement
+   uint lzham_get_max_helper_threads();
+
 } // namespace lzham
 
 #endif // LZHAM_USE_PTHREADS_API

@@ -1,84 +1,10 @@
-// FIXME: Not C compatible - these inlines are a workaround for the lack of a static lib project. (Yes this is freakin lame.)
-
 #pragma once
 
 #define LZHAM_STATIC_LIB 1
-
 #include "lzham.h"
-#include "lzham_decomp.h"
-#include "lzham_comp.h"
 
 #ifdef __cplusplus
-extern "C" {
-#endif
-
-inline lzham_uint32 LZHAM_CDECL lzham_get_version(void)
-{
-   return LZHAM_DLL_VERSION;
-}
-
-inline void LZHAM_CDECL lzham_set_memory_callbacks(lzham_realloc_func pRealloc, lzham_msize_func pMSize, void* pUser_data)
-{
-   lzham::lzham_lib_set_memory_callbacks(pRealloc, pMSize, pUser_data);
-}
-
-inline lzham_decompress_state_ptr LZHAM_CDECL lzham_decompress_init(const lzham_decompress_params *pParams)
-{
-   return lzham::lzham_lib_decompress_init(pParams);
-}
-
-inline lzham_decompress_state_ptr LZHAM_CDECL lzham_decompress_reinit(lzham_decompress_state_ptr pState, const lzham_decompress_params *pParams)
-{
-   return lzham::lzham_lib_decompress_reinit(pState, pParams);
-}
-
-inline lzham_uint32 LZHAM_CDECL lzham_decompress_deinit(lzham_decompress_state_ptr pState)
-{
-   return lzham::lzham_lib_decompress_deinit(pState);
-}
-
-inline lzham_decompress_status_t LZHAM_CDECL lzham_decompress(
-   lzham_decompress_state_ptr pState,
-   const lzham_uint8 *pIn_buf, size_t *pIn_buf_size, 
-   lzham_uint8 *pOut_buf, size_t *pOut_buf_size,
-   lzham_bool no_more_input_bytes_flag)
-{
-   return lzham::lzham_lib_decompress(pState, pIn_buf, pIn_buf_size, pOut_buf, pOut_buf_size, no_more_input_bytes_flag);
-}   
-
-inline lzham_decompress_status_t LZHAM_CDECL lzham_decompress_memory(const lzham_decompress_params *pParams, lzham_uint8* pDst_buf, size_t *pDst_len, const lzham_uint8* pSrc_buf, size_t src_len, lzham_uint32 *pAdler32)
-{
-   return lzham::lzham_lib_decompress_memory(pParams, pDst_buf, pDst_len, pSrc_buf, src_len, pAdler32);
-}
-
-inline lzham_compress_state_ptr LZHAM_CDECL lzham_compress_init(const lzham_compress_params *pParams)
-{
-   return lzham::lzham_lib_compress_init(pParams);
-}
-
-inline lzham_uint32 LZHAM_CDECL lzham_compress_deinit(lzham_compress_state_ptr pState)
-{
-   return lzham::lzham_lib_compress_deinit(pState);
-}
-
-inline lzham_compress_status_t LZHAM_CDECL lzham_compress(
-   lzham_compress_state_ptr pState,
-   const lzham_uint8 *pIn_buf, size_t *pIn_buf_size, 
-   lzham_uint8 *pOut_buf, size_t *pOut_buf_size,
-   lzham_bool no_more_input_bytes_flag)
-{
-   return lzham::lzham_lib_compress(pState, pIn_buf, pIn_buf_size, pOut_buf, pOut_buf_size, no_more_input_bytes_flag);
-}   
-
-inline lzham_compress_status_t LZHAM_CDECL lzham_compress_memory(const lzham_compress_params *pParams, lzham_uint8* pDst_buf, size_t *pDst_len, const lzham_uint8* pSrc_buf, size_t src_len, lzham_uint32 *pAdler32)
-{
-   return lzham::lzham_lib_compress_memory(pParams, pDst_buf, pDst_len, pSrc_buf, src_len, pAdler32);
-}
-
-#ifdef __cplusplus
-}
-#endif
-
+// Like lzham_dynamic_lib, except it sets the function pointer members to point directly to the C functions in lzhamlib
 class lzham_static_lib : public ilzham
 {
    lzham_static_lib(const lzham_static_lib &other);
@@ -96,12 +22,31 @@ public:
       this->lzham_compress_init = ::lzham_compress_init;
       this->lzham_compress_deinit = ::lzham_compress_deinit;
       this->lzham_compress = ::lzham_compress;
+      this->lzham_compress2 = ::lzham_compress2;
       this->lzham_compress_memory = ::lzham_compress_memory;
       this->lzham_decompress_init = ::lzham_decompress_init;
       this->lzham_decompress_reinit = ::lzham_decompress_reinit;
       this->lzham_decompress_deinit = ::lzham_decompress_deinit;
       this->lzham_decompress = ::lzham_decompress;
       this->lzham_decompress_memory = ::lzham_decompress_memory;
+
+      this->lzham_z_version = ::lzham_z_version;
+      this->lzham_z_deflateInit = ::lzham_z_deflateInit;
+      this->lzham_z_deflateInit2 = ::lzham_z_deflateInit2;
+      this->lzham_z_deflateReset = ::lzham_z_deflateReset;
+      this->lzham_z_deflate = ::lzham_z_deflate;
+      this->lzham_z_deflateEnd = ::lzham_z_deflateEnd;
+      this->lzham_z_deflateBound = ::lzham_z_deflateBound;
+      this->lzham_z_compress = ::lzham_z_compress;
+      this->lzham_z_compress2 = ::lzham_z_compress2;
+      this->lzham_z_compressBound = ::lzham_z_compressBound;
+      this->lzham_z_inflateInit = ::lzham_z_inflateInit;
+      this->lzham_z_inflateInit2 = ::lzham_z_inflateInit2;
+      this->lzham_z_inflate = ::lzham_z_inflate;
+      this->lzham_z_inflateEnd = ::lzham_z_inflateEnd;
+      this->lzham_z_uncompress = ::lzham_z_uncompress;
+      this->lzham_z_error = ::lzham_z_error;
+
       return true;
    }
    
@@ -109,3 +54,4 @@ public:
    
    virtual bool is_loaded() { return lzham_get_version != NULL; }
 };
+#endif // __cplusplus

@@ -80,6 +80,11 @@ namespace lzham
       bool init(const init_params& params);
       void clear();
 
+      // sync, or sync+dictionary flush 
+      bool flush(lzham_flush_t flush_type);
+
+      bool reset();
+
       bool put_bytes(const void* pBuf, uint buf_len);
 
       const byte_vec& get_compressed_data() const   { return m_comp_buf; }
@@ -199,8 +204,9 @@ namespace lzham
          state();
 
          void clear();
-
+         
          bool init(CLZBase& lzbase, bool fast_adaptive_huffman_updating, bool use_polar_codes);
+         void reset();
          
          bit_cost_t get_cost(CLZBase& lzbase, const search_accelerator& dict, const lzdecision& lzdec) const;
          bit_cost_t get_len2_match_cost(CLZBase& lzbase, uint dict_pos, uint len2_match_dist, uint is_match_model_index);
@@ -357,7 +363,7 @@ namespace lzham
 
       bool m_finished;
       bool m_use_task_pool;
-      
+            
       struct node_state
       {
          LZHAM_FORCE_INLINE void clear()
@@ -451,7 +457,8 @@ namespace lzham
       uint get_min_block_ratio();
       uint get_max_block_ratio();
       uint get_total_recent_reset_update_rate();
-            
+      
+      bool send_zlib_header();
       bool init_seed_bytes();
       bool send_final_block();
       bool send_configuration();
@@ -463,6 +470,7 @@ namespace lzham
       bool compress_block(const void* pBuf, uint buf_len);
       bool compress_block_internal(const void* pBuf, uint buf_len);
       bool code_decision(lzdecision lzdec, uint& cur_ofs, uint& bytes_to_match);
+      bool send_sync_block(lzham_flush_t flush_type);
    };
 
 } // namespace lzham

@@ -1,7 +1,6 @@
 #pragma once
 
 #define LZHAM_DYNAMIC_LIB 1
-
 #include "lzham.h"
 
 #ifdef _XBOX
@@ -20,6 +19,7 @@
 
 #ifdef __cplusplus
 // Simple helper class that demonstrates how to dynamically load the LZHAM DLL.
+// The load() method loads the DLL, then initializes the member function pointers in ilzham by calling GetProcAddress() on all exported API's defined in lzham_exports.inc.
 class lzham_dll_loader : public ilzham
 {
    lzham_dll_loader(const lzham_dll_loader &other);
@@ -153,4 +153,4 @@ private:
    HMODULE m_handle;
    HRESULT m_win32_error;
 };
-#endif
+#endif // #ifdef __cplusplus

@@ -95,28 +95,79 @@ namespace lzham
       m_match_hist[3] = 1;
    }
 
+   void lzcompressor::state::reset()
+   {
+      m_cur_ofs = 0;
+      m_cur_state = 0;
+      m_block_start_dict_ofs = 0;
+
+      for (uint i = 0; i < LZHAM_ARRAY_SIZE(m_is_match_model); i++) 
+         m_is_match_model[i].clear();
+      for (uint i = 0; i < LZHAM_ARRAY_SIZE(m_is_rep_model); i++) 
+         m_is_rep_model[i].clear();
+      for (uint i = 0; i < LZHAM_ARRAY_SIZE(m_is_rep0_model); i++) 
+         m_is_rep0_model[i].clear();
+      for (uint i = 0; i < LZHAM_ARRAY_SIZE(m_is_rep0_single_byte_model); i++) 
+         m_is_rep0_single_byte_model[i].clear();
+      for (uint i = 0; i < LZHAM_ARRAY_SIZE(m_is_rep1_model); i++) 
+         m_is_rep1_model[i].clear();
+      for (uint i = 0; i < LZHAM_ARRAY_SIZE(m_is_rep2_model); i++) 
+         m_is_rep2_model[i].clear();
+      
+      for (uint i = 0; i < 2; i++)
+      {
+         m_rep_len_table[i].reset();
+         m_large_len_table[i].reset();
+      }
+      m_main_table.reset();
+      m_dist_lsb_table.reset();
+
+      // Only reset the first table in the array, then just clone it to the others because they're all the same when reset. (This is ~9x faster than resetting each one.)
+      m_lit_table[0].reset();
+      for (uint i = 1; i < LZHAM_ARRAY_SIZE(m_lit_table); i++)
+         m_lit_table[i] = m_lit_table[0];
+
+      m_delta_lit_table[0].reset();
+      for (uint i = 1; i < LZHAM_ARRAY_SIZE(m_delta_lit_table); i++)
+         m_delta_lit_table[i] = m_delta_lit_table[0];
+
+      m_match_hist[0] = 1;
+      m_match_hist[1] = 1;
+      m_match_hist[2] = 1;
+      m_match_hist[3] = 1;
+   }
+
    bool lzcompressor::state::init(CLZBase& lzbase, bool fast_adaptive_huffman_updating, bool use_polar_codes)
    {
       m_cur_ofs = 0;
       m_cur_state = 0;
 
-      for (uint i = 0; i < 2; i++)
-      {
-         if (!m_rep_len_table[i].init(true, CLZBase::cNumHugeMatchCodes + (CLZBase::cMaxMatchLen - CLZBase::cMinMatchLen + 1), fast_adaptive_huffman_updating, use_polar_codes)) return false;
-         if (!m_large_len_table[i].init(true, CLZBase::cNumHugeMatchCodes + CLZBase::cLZXNumSecondaryLengths, fast_adaptive_huffman_updating, use_polar_codes)) return false;
-      }
-      if (!m_main_table.init(true, CLZBase::cLZXNumSpecialLengths + (lzbase.m_num_lzx_slots - CLZBase::cLZXLowestUsableMatchSlot) * 8, fast_adaptive_huffman_updating, use_polar_codes)) return false;
-      if (!m_dist_lsb_table.init(true, 16, fast_adaptive_huffman_updating, use_polar_codes)) return false;
+      if (!m_rep_len_table[0].init(true, CLZBase::cNumHugeMatchCodes + (CLZBase::cMaxMatchLen - CLZBase::cMinMatchLen + 1), fast_adaptive_huffman_updating, use_polar_codes)) 
+         return false;
+      if (!m_rep_len_table[1].assign(m_rep_len_table[0])) 
+         return false;
+      
+      if (!m_large_len_table[0].init(true, CLZBase::cNumHugeMatchCodes + CLZBase::cLZXNumSecondaryLengths, fast_adaptive_huffman_updating, use_polar_codes)) 
+         return false;
+      if (!m_large_len_table[1].assign(m_large_len_table[0])) 
+         return false;
 
-      for (uint i = 0; i < (1 << CLZBase::cNumLitPredBits); i++)
-      {
-         if (!m_lit_table[i].init(true, 256, fast_adaptive_huffman_updating, use_polar_codes)) return false;
-      }
+      if (!m_main_table.init(true, CLZBase::cLZXNumSpecialLengths + (lzbase.m_num_lzx_slots - CLZBase::cLZXLowestUsableMatchSlot) * 8, fast_adaptive_huffman_updating, use_polar_codes)) 
+         return false;
+      if (!m_dist_lsb_table.init(true, 16, fast_adaptive_huffman_updating, use_polar_codes)) 
+         return false;
 
-      for (uint i = 0; i < (1 << CLZBase::cNumDeltaLitPredBits); i++)
-      {
-         if (!m_delta_lit_table[i].init(true, 256, fast_adaptive_huffman_updating, use_polar_codes)) return false;
-      }
+      if (!m_lit_table[0].init(true, 256, fast_adaptive_huffman_updating, use_polar_codes)) 
+         return false;
+      for (uint i = 1; i < (1 << CLZBase::cNumLitPredBits); i++)
+         if (!m_lit_table[i].assign(m_lit_table[0]))
+            return false;
+
+      if (!m_delta_lit_table[0].init(true, 256, fast_adaptive_huffman_updating, use_polar_codes)) 
+         return false;
+      for (uint i = 1; i < (1 << CLZBase::cNumDeltaLitPredBits); i++)
+         if (!m_delta_lit_table[i].assign(m_delta_lit_table[0]))
+            return false;
 
       m_match_hist[0] = 1;
       m_match_hist[1] = 1;
@@ -346,11 +397,11 @@ namespace lzham
 
             uint num_extra_bits = lzbase.m_lzx_position_extra_bits[match_slot];
             if (num_extra_bits < 3)
-               cost += (num_extra_bits << cBitCostScaleShift);
+               cost += convert_to_scaled_bitcost(num_extra_bits);
             else
             {
                if (num_extra_bits > 4)
-                  cost += ((num_extra_bits - 4) << cBitCostScaleShift);
+                  cost += convert_to_scaled_bitcost(num_extra_bits - 4);
 
                cost += m_dist_lsb_table.get_cost(match_extra & 15);
             }
@@ -386,11 +437,11 @@ namespace lzham
 
       uint num_extra_bits = lzbase.m_lzx_position_extra_bits[match_slot];
       if (num_extra_bits < 3)
-         cost += (num_extra_bits << cBitCostScaleShift);
+         cost += convert_to_scaled_bitcost(num_extra_bits);
       else
       {
          if (num_extra_bits > 4)
-            cost += ((num_extra_bits - 4) << cBitCostScaleShift);
+            cost += convert_to_scaled_bitcost(num_extra_bits - 4);
 
          cost += m_dist_lsb_table.get_cost(match_extra & 15);
       }
@@ -529,11 +580,11 @@ namespace lzham
       uint num_extra_bits = lzbase.m_lzx_position_extra_bits[match_slot];
 
       if (num_extra_bits < 3)
-         cost += (num_extra_bits << cBitCostScaleShift);
+         cost += convert_to_scaled_bitcost(num_extra_bits);
       else
       {
          if (num_extra_bits > 4)
-            cost += ((num_extra_bits - 4) << cBitCostScaleShift);
+            cost += convert_to_scaled_bitcost(num_extra_bits - 4);
 
          cost += m_dist_lsb_table.get_cost(match_extra & 15);
       }
@@ -1341,7 +1392,7 @@ namespace lzham
             LZHAM_VERIFY(match_len <= actual_match_len);
 
             m_total_truncated_matches += match_len < actual_match_len;
-            m_match_truncation_len_hist[actual_match_len - match_len]++;
+            m_match_truncation_len_hist[math::maximum<int>(0, actual_match_len - match_len)]++;
 
             uint type_index = 4;
             if (!lzdec.is_full_match())
@@ -1391,7 +1442,7 @@ namespace lzham
          }
          else
          {
-            m_full_match_stats[match_len].update(cost_in_bits);
+            m_full_match_stats[math::minimum<int>(cMaxMatchLen, match_len)].update(cost_in_bits);
 
             if (match_len == 2)
             {

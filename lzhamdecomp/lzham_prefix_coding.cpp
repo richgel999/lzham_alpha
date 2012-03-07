@@ -99,10 +99,10 @@ namespace lzham
             const uint c = pCodesizes[i];
             if (c)
             {
-               uint ofs = next_sorted_ofs[c];
-               next_sorted_ofs[c] = ofs + 1;
+               uint next_ofs = next_sorted_ofs[c];
+               next_sorted_ofs[c] = next_ofs + 1;
             
-               pCodesizes[i] = static_cast<uint8>(new_codesizes[ofs]);
+               pCodesizes[i] = static_cast<uint8>(new_codesizes[next_ofs]);
             }
          }
             
@@ -178,7 +178,7 @@ namespace lzham
 
          uint sorted_positions[cMaxExpectedCodeSize + 1];
                
-         uint code = 0;
+         uint next_code = 0;
 
          uint total_used_syms = 0;
          uint max_code_size = 0;
@@ -194,20 +194,20 @@ namespace lzham
                min_code_size = math::minimum(min_code_size, i);
                max_code_size = math::maximum(max_code_size, i);
                   
-               min_codes[i - 1] = code;
+               min_codes[i - 1] = next_code;
                
-               pTables->m_max_codes[i - 1] = code + n - 1;
+               pTables->m_max_codes[i - 1] = next_code + n - 1;
                pTables->m_max_codes[i - 1] = 1 + ((pTables->m_max_codes[i - 1] << (16 - i)) | ((1 << (16 - i)) - 1));
                
                pTables->m_val_ptrs[i - 1] = total_used_syms;
                
                sorted_positions[i] = total_used_syms;
                
-               code += n;
+               next_code += n;
                total_used_syms += n;
             }
 
-            code <<= 1;
+            next_code <<= 1;
          }
          
          pTables->m_total_used_syms = total_used_syms;
@@ -323,7 +323,7 @@ namespace lzham
             if (i >= 1)
             {
                pTables->m_decode_start_code_size = table_bits + 1;
-               for (uint i = table_bits + 1; i <= max_code_size; i++)
+               for (i = table_bits + 1; i <= max_code_size; i++)
                {
                   if (num_codes[i])
                   {

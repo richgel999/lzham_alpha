@@ -21,7 +21,9 @@ namespace lzham
    const uint32 cBitCostScale = (1U << cBitCostScaleShift);
    const bit_cost_t cBitCostMax = UINT64_MAX;
 
-   extern uint32 gProbCost[cSymbolCodecArithProbScale];
+   inline bit_cost_t convert_to_scaled_bitcost(uint bits) { LZHAM_ASSERT(bits <= 255); uint32 scaled_bits = bits << cBitCostScaleShift; return static_cast<bit_cost_t>(scaled_bits); }
+
+   extern uint32 g_prob_cost[cSymbolCodecArithProbScale];
 
    class raw_quasi_adaptive_huffman_data_model
    {
@@ -30,8 +32,9 @@ namespace lzham
       raw_quasi_adaptive_huffman_data_model(const raw_quasi_adaptive_huffman_data_model& other);
       ~raw_quasi_adaptive_huffman_data_model();
 
+      bool assign(const raw_quasi_adaptive_huffman_data_model& rhs);
       raw_quasi_adaptive_huffman_data_model& operator= (const raw_quasi_adaptive_huffman_data_model& rhs);
-
+      
       void clear();
 
       bool init(bool encoding, uint total_syms, bool fast_encoding, bool use_polar_codes, const uint16 *pInitial_sym_freq = NULL);
@@ -44,7 +47,7 @@ namespace lzham
 
       bool update(uint sym);
 
-      inline bit_cost_t get_cost(uint sym) const { return m_code_sizes[sym] << cBitCostScaleShift; }
+      inline bit_cost_t get_cost(uint sym) const { return convert_to_scaled_bitcost(m_code_sizes[sym]); }
 
    public:
       lzham::vector<uint16>            m_initial_sym_freq;
@@ -105,7 +108,7 @@ namespace lzham
          LZHAM_ASSERT(m_bit_0_prob < cSymbolCodecArithProbScale);
       }
 
-      inline bit_cost_t get_cost(uint bit) const { return gProbCost[bit ? (cSymbolCodecArithProbScale - m_bit_0_prob) : m_bit_0_prob]; }
+      inline bit_cost_t get_cost(uint bit) const { return g_prob_cost[bit ? (cSymbolCodecArithProbScale - m_bit_0_prob) : m_bit_0_prob]; }
 
    public:
       uint16 m_bit_0_prob;
@@ -156,8 +159,11 @@ namespace lzham
    public:
       symbol_codec();
 
+      void reset();
+      
+      // clear() is like reset(), except it also frees all memory.
       void clear();
-
+      
       // Encoding
       bool start_encoding(uint expected_file_size);
       bool encode_bits(uint bits, uint num_bits);
@@ -283,6 +289,11 @@ namespace lzham
       } m_mode;
    };
 
+// Optional macros for faster decompression. These macros implement the symbol_codec class's decode functionality.
+// This is hard to debug (and just plain ugly), but using these macros eliminate function calls, and they place the most important 
+// member variables on the stack so they're hopefully put in registers (avoiding horrible load hit stores on some CPU's).
+// The user must define the LZHAM_DECODE_NEEDS_BYTES macro, which is invoked when the decode buffer is exhausted.
+
 #define LZHAM_SYMBOL_CODEC_DECODE_DECLARE(codec) \
    uint arith_value = 0; \
    uint arith_length = 0; \
@@ -310,7 +321,7 @@ namespace lzham
 { \
    while (LZHAM_BUILTIN_EXPECT(bit_count < (int)(num_bits), 0)) \
    { \
-      uint c; \
+      uint r; \
       if (LZHAM_BUILTIN_EXPECT(pDecode_buf_next == codec.m_pDecode_buf_end, 0)) \
       { \
          if (LZHAM_BUILTIN_EXPECT(!codec.m_decode_buf_eof, 1)) \
@@ -319,15 +330,15 @@ namespace lzham
             LZHAM_DECODE_NEEDS_BYTES \
             LZHAM_SYMBOL_CODEC_DECODE_BEGIN(codec) \
          } \
-         c = 0; \
-         if (LZHAM_BUILTIN_EXPECT(pDecode_buf_next < codec.m_pDecode_buf_end, 1)) c = *pDecode_buf_next++; \
+         r = 0; \
+         if (LZHAM_BUILTIN_EXPECT(pDecode_buf_next < codec.m_pDecode_buf_end, 1)) r = *pDecode_buf_next++; \
       } \
       else \
-         c = *pDecode_buf_next++; \
+         r = *pDecode_buf_next++; \
       bit_count += 8; \
-      bit_buf |= (static_cast<symbol_codec::bit_buf_t>(c) << (symbol_codec::cBitBufSize - bit_count)); \
+      bit_buf |= (static_cast<symbol_codec::bit_buf_t>(r) << (symbol_codec::cBitBufSize - bit_count)); \
    } \
-   result = num_bits ? static_cast<uint>(bit_buf >> (symbol_codec::cBitBufSize - (num_bits))) : 0; \
+   result = (num_bits) ? static_cast<uint>(bit_buf >> (symbol_codec::cBitBufSize - (num_bits))) : 0; \
    bit_buf <<= (num_bits); \
    bit_count -= (num_bits); \
 }

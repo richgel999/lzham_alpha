@@ -28,30 +28,58 @@ namespace lzham
             *this = other;
          }
 
-         decoder_tables& operator= (const decoder_tables& other)
+         inline decoder_tables& operator= (const decoder_tables& rhs)
          {
-            if (this == &other)
-               return *this;
-
-            clear();
-
-            memcpy(this, &other, sizeof(*this));
-
-            if (other.m_lookup)
-            {
-               m_lookup = lzham_new_array<uint32>(m_cur_lookup_size);
-               memcpy(m_lookup, other.m_lookup, sizeof(m_lookup[0]) * m_cur_lookup_size);
-            }
-
-            if (other.m_sorted_symbol_order)
-            {
-               m_sorted_symbol_order = lzham_new_array<uint16>(m_cur_sorted_symbol_order_size);
-               memcpy(m_sorted_symbol_order, other.m_sorted_symbol_order, sizeof(m_sorted_symbol_order[0]) * m_cur_sorted_symbol_order_size);
-            }
-
+            assign(rhs);
             return *this;
          }
 
+         inline bool assign(const decoder_tables& rhs)
+         {
+            if (this == &rhs)
+               return true;
+
+            uint32* pCur_lookup = m_lookup;
+            uint16* pCur_sorted_symbol_order = m_sorted_symbol_order;
+
+            memcpy(this, &rhs, sizeof(*this));
+
+            if ((pCur_lookup) && (pCur_sorted_symbol_order) && (rhs.m_cur_lookup_size == m_cur_lookup_size) && (rhs.m_cur_sorted_symbol_order_size == m_cur_sorted_symbol_order_size))
+            {
+               m_lookup = pCur_lookup;
+               m_sorted_symbol_order = pCur_sorted_symbol_order;
+
+               memcpy(m_lookup, rhs.m_lookup, sizeof(m_lookup[0]) * m_cur_lookup_size);
+               memcpy(m_sorted_symbol_order, rhs.m_sorted_symbol_order, sizeof(m_sorted_symbol_order[0]) * m_cur_sorted_symbol_order_size);
+            }
+            else
+            {
+               lzham_delete_array(pCur_lookup);
+               m_lookup = NULL;
+
+               if (rhs.m_lookup)
+               {
+                  m_lookup = lzham_new_array<uint32>(m_cur_lookup_size);
+                  if (!m_lookup)
+                     return false;
+                  memcpy(m_lookup, rhs.m_lookup, sizeof(m_lookup[0]) * m_cur_lookup_size);
+               }
+
+               lzham_delete_array(pCur_sorted_symbol_order);
+               m_sorted_symbol_order = NULL;
+
+               if (rhs.m_sorted_symbol_order)
+               {
+                  m_sorted_symbol_order = lzham_new_array<uint16>(m_cur_sorted_symbol_order_size);
+                  if (!m_sorted_symbol_order)
+                     return false;
+                  memcpy(m_sorted_symbol_order, rhs.m_sorted_symbol_order, sizeof(m_sorted_symbol_order[0]) * m_cur_sorted_symbol_order_size);
+               }
+            }
+
+            return true;
+         }
+         
          inline void clear()
          {
             if (m_lookup)

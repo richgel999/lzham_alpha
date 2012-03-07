@@ -1,8 +1,8 @@
 <?xml version="1.0" encoding="UTF-8" standalone="yes" ?>
 <CodeBlocks_workspace_file>
 	<Workspace title="Workspace">
-		<Project filename="lzhamtest/lzhamtest.cbp" active="1" />
-		<Project filename="lzhamdll/lzhamdll.cbp">
+		<Project filename="lzhamtest/lzhamtest.cbp" />
+		<Project filename="lzhamdll/lzhamdll.cbp" active="1">
 			<Depends filename="lzhamcomp/lzhamcomp.cbp" />
 			<Depends filename="lzhamdecomp/lzhamdecomp.cbp" />
 		</Project>
