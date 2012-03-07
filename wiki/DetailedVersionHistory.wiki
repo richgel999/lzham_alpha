@@ -8,6 +8,24 @@ Currently only released to SVN head.
 
 Latest stable version.
 
+Alpha7's compressed bitstream is NOT compatible with previous versions. (Sorry, but that's why I'm using the "Alpha" designation. I'll be locking LZHAM's bitstream sometime next year.)
+
+Finally wrote some [http://code.google.com/p/lzham/wiki/API_Docs documentation].
+
+Alpha7 supports static (seed) dictionaries, which are useful for creating compressed patch files ([http://en.wikipedia.org/wiki/Delta_encoding differential/delta compression]). Seed dictionary sizes are limited to the size of the compresssor's dictionary size (i.e. max of 512MB for x64, and 64MB for x86). See the -a option in lzhamtest, or the m_num_seed_bytes/m_pSeed_bytes members of the compression/decompression param structs in include/lzham.h.
+
+I added much more documentation to the main header file include/lzham.h.
+
+I added the LZHAM_MORE_FREQUENT_TABLE_UPDATING macro to lzham_symbol_code.cpp. It's jammed to 1 in this release, for a minor compression ratio boost. Unfortunately, this change slows decompression by around 1-2% relative to Alpha6. I hope to get this speed back by optimizing the prefix code table construction code more (by borrowing some work I did in the miniz project). I'm going to make this a compression flag in the next release. For now, if you don't like this just set this macro to 0.
+
+I've fixed a few minor API bugs found while integrating LZHAM into the command line and GUI versions of 7-zip. I now have a customized version of 7-zip that supports LZHAM, which is great for testing, but I'm not planning on releasing it (unless there's interest).
+
+I added initial support for large matches (>258 bytes), which are currently only used for delta compression. 
+
+The compressor can now inform the decompressor to reinitialize the update frequency of all prefix code tables back to the max frequency. This feature is only exploited when the LZHAM_COMP_FLAG_TRADEOFF_DECOMPRESSION_RATE_FOR_COMP_RATIO compression flag is enabled, because the extra table updates will slow down decompression. When enabled, the compressor tracks the compression ratio history of the last 6 blocks. If a block's ratio substantially drops relative to the previous 6, it issues a table rate reset.
+
+Added new file: lzham_lzcomp_state.cpp, which contains all the "lzcompressor::state" related classes originally declared in lzham_lzcomp_internal.cpp. Now, all parsing and high-level control related code is in lzham_lzcomp_internal.cpp, and all state updating/encoding is in lzham_lzcomp_state.cpp.
+
 *Alpha6 Changes*
 
 I modified the compressor to use fixed point arithmetic to track bit prices, instead of floating point math. (The compressor should not use floating point math anywhere now.) This ensures the compressor's output doesn't vary between compilers, optimization settings, platforms, etc. The compression ratio has actually improved a tiny amount (by around .05% to .08%) in this release due to this change. (Thanks to Aaron Nicholls for emphasizing the importance of deterministic compression.)
