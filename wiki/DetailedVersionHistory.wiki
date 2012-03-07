@@ -1,9 +1,11 @@
 #summary Detailed version release history
 
 *Alpha8 Changes - March 6, 2012*
+
 Currently only released to SVN head.
 
 *Alpha7 Changes*
+
 Latest stable version.
 
 *Alpha6 Changes*
