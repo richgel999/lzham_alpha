@@ -2,7 +2,7 @@
 
 *Alpha8 Changes - March 6, 2012*
 
-Currently only released to SVN head.
+Currently only released to SVN head. Not tested under Linux yet.
 
 *Alpha7 Changes*
 
