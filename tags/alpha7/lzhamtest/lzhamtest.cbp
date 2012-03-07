@@ -1,0 +1,85 @@
+<?xml version="1.0" encoding="UTF-8" standalone="yes" ?>
+<CodeBlocks_project_file>
+	<FileVersion major="1" minor="6" />
+	<Project>
+		<Option title="lzhamtest" />
+		<Option pch_mode="2" />
+		<Option compiler="gcc" />
+		<Build>
+			<Target title="Debug x86">
+				<Option output="..\bin_mingw\lzhamtest_x86D" prefix_auto="1" extension_auto="1" />
+				<Option working_dir="..\bin_mingw" />
+				<Option object_output="obj\Debug_x86\" />
+				<Option type="1" />
+				<Option compiler="gcc" />
+				<Option parameters="-v -d26 c E:\dev\corpus\adobe.7z 1" />
+				<Compiler>
+					<Add option="-g" />
+					<Add option="-m32" />
+					<Add option="-D_DEBUG" />
+				</Compiler>
+				<Linker>
+					<Add option="-m32" />
+				</Linker>
+			</Target>
+			<Target title="Release x86">
+				<Option output="..\bin_mingw\lzhamtest_x86" prefix_auto="1" extension_auto="1" />
+				<Option working_dir="..\bin_mingw" />
+				<Option object_output="obj\Release_x86\" />
+				<Option type="1" />
+				<Option compiler="gcc" />
+				<Compiler>
+					<Add option="-fomit-frame-pointer" />
+					<Add option="-O3" />
+					<Add option="-m32" />
+					<Add option="-DNDEBUG" />
+				</Compiler>
+				<Linker>
+					<Add option="-s" />
+					<Add option="-m32" />
+				</Linker>
+			</Target>
+			<Target title="Debug x64">
+				<Option output="..\bin_mingw\lzhamtest_x64D" prefix_auto="1" extension_auto="1" />
+				<Option working_dir="..\bin_mingw" />
+				<Option object_output="obj\Debug_x64\" />
+				<Option type="1" />
+				<Option compiler="gcc" />
+				<Option parameters="d 1 2" />
+				<Compiler>
+					<Add option="-g" />
+					<Add option="-D_DEBUG" />
+				</Compiler>
+			</Target>
+			<Target title="Release x64">
+				<Option output="..\bin_mingw\lzhamtest_x64" prefix_auto="1" extension_auto="1" />
+				<Option working_dir="..\bin_mingw" />
+				<Option object_output="obj\Release_x64\" />
+				<Option type="1" />
+				<Option compiler="gcc" />
+				<Compiler>
+					<Add option="-fomit-frame-pointer" />
+					<Add option="-O3" />
+					<Add option="-DNDEBUG" />
+				</Compiler>
+				<Linker>
+					<Add option="-s" />
+				</Linker>
+			</Target>
+		</Build>
+		<Compiler>
+			<Add option="-Wall" />
+			<Add option="-fexceptions" />
+			<Add option="-Wno-unused-value" />
+			<Add option="-Wno-unused" />
+			<Add directory="..\include" />
+		</Compiler>
+		<Unit filename="lzhamtest.cpp" />
+		<Unit filename="timer.cpp" />
+		<Unit filename="timer.h" />
+		<Extensions>
+			<code_completion />
+			<debugger />
+		</Extensions>
+	</Project>
+</CodeBlocks_project_file>

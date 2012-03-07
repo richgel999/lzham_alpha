@@ -1,0 +1,13 @@
+LIBRARY      lzhamdll
+EXPORTS
+    lzham_get_version @1
+	lzham_set_memory_callbacks @2
+	lzham_compress_init @3
+    lzham_compress @4
+    lzham_compress_deinit @5
+    lzham_compress_memory @6
+    lzham_decompress_init @7
+    lzham_decompress @8
+    lzham_decompress_deinit @9
+    lzham_decompress_memory @10
+	lzham_decompress_reinit @11
