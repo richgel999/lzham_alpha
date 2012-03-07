@@ -74,6 +74,28 @@ namespace lzham
       return true;
    }
 
+   void search_accelerator::reset()
+   {
+      m_cur_dict_size = 0;
+      m_lookahead_size = 0;
+      m_lookahead_pos = 0;
+      m_fill_lookahead_pos = 0;
+      m_fill_lookahead_size = 0;
+      m_fill_dict_size = 0;
+      m_num_completed_helper_threads = 0;
+
+      // Clearing the hash tables is only necessary for determinism (otherwise, it's possible the matches returned after a reset will depend on the data processes before the reset).
+      if (m_hash.size()) 
+         memset(m_hash.get_ptr(), 0, m_hash.size_in_bytes());
+      if (m_digram_hash.size())
+         memset(m_digram_hash.get_ptr(), 0, m_digram_hash.size_in_bytes());
+   }
+
+   void search_accelerator::flush()
+   {
+      m_cur_dict_size = 0;
+   }
+
    uint search_accelerator::get_max_add_bytes() const
    {
       uint add_pos = static_cast<uint>(m_lookahead_pos & (m_max_dict_size - 1));
@@ -326,8 +348,6 @@ namespace lzham
 
    bool search_accelerator::find_len2_matches()
    {
-      enum { cDigramHashSize = 4096 };
-
       if (!m_digram_hash.size())
       {
          if (!m_digram_hash.try_resize(cDigramHashSize))

@@ -30,7 +30,7 @@ namespace lzham
       m_num_lzx_slots = 0;         
       
       const uint largest_dist = m_dict_size - 1;
-      for (int i = 0; i < cLZXMaxPositionSlots; i++)
+      for (i = 0; i < cLZXMaxPositionSlots; i++)
       {
          if ( (largest_dist >= m_lzx_position_base[i]) &&
               (largest_dist < (m_lzx_position_base[i] + (1 << m_lzx_position_extra_bits[i])) ) )

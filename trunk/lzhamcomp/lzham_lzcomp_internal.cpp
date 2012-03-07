@@ -93,7 +93,7 @@ namespace lzham
          if (!m_accel.add_bytes_begin(num_bytes_to_add, static_cast<const uint8*>(m_params.m_pSeed_bytes) + cur_seed_ofs))
             return false;
          m_accel.add_bytes_end();
-         
+
          m_accel.advance_bytes(num_bytes_to_add);
 
          cur_seed_ofs += num_bytes_to_add;
@@ -110,7 +110,7 @@ namespace lzham
          return false;
       if ((params.m_compression_level < 0) || (params.m_compression_level > cCompressionLevelCount))
          return false;
-      
+
       m_params = params;
       m_use_task_pool = (m_params.m_pTask_pool) && (m_params.m_pTask_pool->get_num_threads() != 0) && (m_params.m_max_helper_threads > 0);
       if ((m_params.m_max_helper_threads) && (!m_use_task_pool))
@@ -129,7 +129,7 @@ namespace lzham
 
       if (m_params.m_lzham_compress_flags & LZHAM_COMP_FLAG_FORCE_POLAR_CODING)
          m_settings.m_use_polar_codes = true;
-      
+
       uint max_block_size = dict_size / 8;
       if (m_params.m_block_size > max_block_size)
       {
@@ -209,14 +209,85 @@ namespace lzham
             return false;
       }
 
+      m_block_history_size = 0;
+      m_block_history_next = 0;
+
       if (params.m_num_seed_bytes)
       {
          if (!init_seed_bytes())
             return false;
       }
 
-      m_block_history_size = 0;
-      m_block_history_next = 0;
+      if (!send_zlib_header())
+         return false;
+
+      m_src_size = 0;
+
+      return true;
+   }
+
+   // See http://www.gzip.org/zlib/rfc-zlib.html
+   // Method is set to 14 (LZHAM) and CINFO is (window_size - 15).
+   bool lzcompressor::send_zlib_header()
+   {
+      if ((m_params.m_lzham_compress_flags & LZHAM_COMP_FLAG_WRITE_ZLIB_STREAM) == 0)
+         return true;
+
+      // set CM (method) and CINFO (dictionary size) fields
+      int cmf = LZHAM_Z_LZHAM | ((m_params.m_dict_size_log2 - 15) << 4);
+
+      // set FLEVEL by mapping LZHAM's compression level to zlib's
+      int flg = 0;
+      switch (m_params.m_compression_level)
+      {
+         case LZHAM_COMP_LEVEL_FASTEST:
+         {
+            flg = 0 << 6;
+            break;
+         }
+         case LZHAM_COMP_LEVEL_FASTER:
+         {
+            flg = 1 << 6;
+            break;
+         }
+         case LZHAM_COMP_LEVEL_DEFAULT:
+         case LZHAM_COMP_LEVEL_BETTER:
+         {
+            flg = 2 << 6;
+            break;
+         }
+         default:
+         {
+            flg = 3 << 6;
+            break;
+         }
+      }
+
+      // set FDICT flag
+      if (m_params.m_pSeed_bytes)
+         flg |= 32;
+
+      int check = ((cmf << 8) + flg) % 31;
+      if (check)
+         flg += (31 - check);
+
+      LZHAM_ASSERT(0 == (((cmf << 8) + flg) % 31));
+      if (!m_comp_buf.try_push_back(static_cast<uint8>(cmf)))
+         return false;
+      if (!m_comp_buf.try_push_back(static_cast<uint8>(flg)))
+         return false;
+
+      if (m_params.m_pSeed_bytes)
+      {
+         // send adler32 of DICT
+         uint dict_adler32 = adler32(m_params.m_pSeed_bytes, m_params.m_num_seed_bytes);
+         for (uint i = 0; i < 4; i++)
+         {
+            if (!m_comp_buf.try_push_back(static_cast<uint8>(dict_adler32 >> 24)))
+               return false;
+            dict_adler32 <<= 8;
+         }
+      }
 
       return true;
    }
@@ -224,7 +295,7 @@ namespace lzham
    void lzcompressor::clear()
    {
       m_codec.clear();
-      m_src_size = 0;
+      m_src_size = -1;
       m_src_adler32 = cInitAdler32;
       m_block_buf.clear();
       m_comp_buf.clear();
@@ -253,6 +324,40 @@ namespace lzham
          parse_state.m_emit_decisions_backwards = false;
          parse_state.m_failed = false;
       }
+
+      m_block_history_size = 0;
+      m_block_history_next = 0;
+   }
+
+   bool lzcompressor::reset()
+   {
+      if (m_src_size < 0)
+         return false;
+
+      m_accel.reset();
+      m_codec.reset();
+      m_stats.clear();
+      m_src_size = 0;
+      m_src_adler32 = cInitAdler32;
+      m_block_buf.try_resize(0);
+      m_comp_buf.try_resize(0);
+
+      m_step = 0;
+      m_finished = false;
+      m_block_start_dict_ofs = 0;
+      m_block_index = 0;
+      m_state.reset();
+
+      m_block_history_size = 0;
+      m_block_history_next = 0;
+
+      if (m_params.m_num_seed_bytes)
+      {
+         if (!init_seed_bytes())
+            return false;
+      }
+
+      return send_zlib_header();
    }
 
    bool lzcompressor::code_decision(lzdecision lzdec, uint& cur_ofs, uint& bytes_to_match)
@@ -287,6 +392,82 @@ namespace lzham
       m_step++;
 
       return true;
+   }
+
+   bool lzcompressor::send_sync_block(lzham_flush_t flush_type)
+   {
+      m_codec.reset();
+
+      if (!m_codec.start_encoding(128))
+         return false;
+#ifdef LZHAM_LZDEBUG
+      if (!m_codec.encode_bits(166, 12))
+         return false;
+#endif
+      if (!m_codec.encode_bits(cSyncBlock, cBlockHeaderBits))
+         return false;
+
+      int flush_code = 0;
+      switch (flush_type)
+      {
+         case LZHAM_FULL_FLUSH:
+            flush_code = 2;
+            break;
+         case LZHAM_TABLE_FLUSH:
+            flush_code = 1;
+            break;
+         case LZHAM_SYNC_FLUSH:
+         case LZHAM_NO_FLUSH:
+         case LZHAM_FINISH:
+            flush_code = 0;
+            break;
+      }
+      if (!m_codec.encode_bits(flush_code, cBlockFlushTypeBits))
+         return false;
+
+      if (!m_codec.encode_align_to_byte())
+         return false;
+      if (!m_codec.encode_bits(0x0000, 16))
+         return false;
+      if (!m_codec.encode_bits(0xFFFF, 16))
+         return false;
+      if (!m_codec.stop_encoding(true))
+         return false;
+      if (!m_comp_buf.append(m_codec.get_encoding_buf()))
+         return false;
+
+      m_block_index++;
+      return true;
+   }
+
+   bool lzcompressor::flush(lzham_flush_t flush_type)
+   {
+      LZHAM_ASSERT(!m_finished);
+      if (m_finished)
+         return false;
+
+      bool status = true;
+      if (m_block_buf.size())
+      {
+         status = compress_block(m_block_buf.get_ptr(), m_block_buf.size());
+
+         m_block_buf.try_resize(0);
+      }
+
+      if (status)
+      {
+         status = send_sync_block(flush_type);
+
+         if (LZHAM_FULL_FLUSH == flush_type)
+         {
+            m_accel.flush();
+            m_state.reset();
+         }
+      }
+
+      lzham_flush_buffered_printf();
+
+      return status;
    }
 
    bool lzcompressor::put_bytes(const void* pBuf, uint buf_len)
@@ -337,7 +518,7 @@ namespace lzham
             else
             {
                // Less than a full block available - append to already accumulated bytes.
-               if (!m_block_buf.append(static_cast<const uint8 *>(pSrcBuf), num_bytes_to_copy)) 
+               if (!m_block_buf.append(static_cast<const uint8 *>(pSrcBuf), num_bytes_to_copy))
                   return false;
 
                LZHAM_ASSERT(m_block_buf.size() <= m_params.m_block_size);
@@ -419,7 +600,7 @@ namespace lzham
 
       return true;
    }
-      
+
    void lzcompressor::node::add_state(
       int parent_index, int parent_state_index,
       const lzdecision &lzdec, state &parent_state,
@@ -769,8 +950,17 @@ namespace lzham
       return true;
    }
 
+   // Parsing notes:
    // The regular "optimal" parser only tracks the single cheapest candidate LZ decision per lookahead character.
-   // It assumes the input statistics are locally stationary over the input block to parse.
+   // This function finds the shortest path through an extremely dense node graph using a streamlined/simplified Dijkstra's algorithm with some coding heuristics.
+   // Graph edges are LZ "decisions", cost is measured in fractional bits needed to code each graph edge, and graph nodes are lookahead characters.
+   // There is no need to track visited/unvisted nodes, or find the next cheapest unvisted node in each iteration. The search always proceeds sequentially, visiting each lookahead character in turn from left/right.
+   // The major CPU expense of this function is the complexity of LZ decision cost evaluation, so a lot of implementation effort is spent here reducing this overhead.
+   // To simplify the problem, it assumes the input statistics are locally stationary over the input block to parse. (Otherwise, it would need to store, track, and update
+   // unique symbol statistics for each lookahead character, which would be very costly.)
+   // This function always sequentially pushes "forward" the unvisited node horizon. This horizon frequently collapses to a single node, which guarantees that the shortest path through the
+   // graph must pass through this node. LZMA tracks cumulative bitprices relative to this node, while LZHAM currently always tracks cumulative bitprices relative to the first node in the lookahead buffer.
+   // In very early versions of LZHAM the parse was much more understandable (straight Dijkstra with almost no bit price optimizations or coding heuristics).
    bool lzcompressor::optimal_parse(parse_thread_state &parse_state)
    {
       LZHAM_ASSERT(parse_state.m_bytes_to_match <= cMaxParseGraphNodes);
@@ -938,9 +1128,9 @@ namespace lzham
 
             const uint min_truncate_match_len = max_match_len;
 
-            // Now get all full matches: the nearest matches at each match length. (Actually, we don't 
-            // always get the nearest match. The match finder favors those matches which have the lowest value 
-            // in the nibble of each match distance, all other things being equal, to help exploit how the lowest 
+            // Now get all full matches: the nearest matches at each match length. (Actually, we don't
+            // always get the nearest match. The match finder favors those matches which have the lowest value
+            // in the nibble of each match distance, all other things being equal, to help exploit how the lowest
             // nibble of match distances is separately coded.)
             const dict_match* pMatches = m_accel.find_matches(cur_lookahead_ofs);
             if (pMatches)
@@ -1091,7 +1281,7 @@ namespace lzham
          m_parse_jobs_complete.release();
       }
    }
-   
+
    // ofs is the absolute dictionary offset, must be >= the lookahead offset.
    // TODO: Doesn't find len2 matches
    int lzcompressor::enumerate_lz_decisions(uint ofs, const state& cur_state, lzham::vector<lzpriced_decision>& decisions, uint min_match_len, uint max_match_len)
@@ -1115,7 +1305,7 @@ namespace lzham
          lit_dec.init(ofs, 0, 0, 0);
          lit_dec.m_cost = cur_state.get_cost(*this, m_accel, lit_dec);
          largest_cost = lit_dec.m_cost;
-                  
+
          largest_len = 1;
       }
       else
@@ -1202,7 +1392,7 @@ namespace lzham
    {
       parse_state.m_failed = true;
       parse_state.m_emit_decisions_backwards = false;
-      
+
       const uint bytes_to_parse = parse_state.m_bytes_to_match;
 
       const uint lookahead_start_ofs = m_accel.get_lookahead_pos() & m_accel.get_max_dict_size_mask();
@@ -1212,26 +1402,26 @@ namespace lzham
       uint cur_ofs = 0;
 
       state &approx_state = parse_state.m_initial_state;
-      
+
       lzham::vector<lzpriced_decision> &decisions = parse_state.m_temp_decisions;
-      
+
       if (!decisions.try_reserve(384))
          return false;
 
-      if (!parse_state.m_best_decisions.try_resize(0)) 
+      if (!parse_state.m_best_decisions.try_resize(0))
          return false;
-      
+
       while (cur_ofs < bytes_to_parse)
       {
          const uint max_admissable_match_len = LZHAM_MIN(CLZBase::cMaxHugeMatchLen, bytes_to_parse - cur_ofs);
-         
+
          int largest_dec_index = enumerate_lz_decisions(cur_dict_ofs, approx_state, decisions, 1, max_admissable_match_len);
          if (largest_dec_index < 0)
             return false;
-                  
+
          const lzpriced_decision &dec = decisions[largest_dec_index];
 
-         if (!parse_state.m_best_decisions.try_push_back(dec)) 
+         if (!parse_state.m_best_decisions.try_push_back(dec))
             return false;
 
          approx_state.partial_advance(dec);
@@ -1249,11 +1439,11 @@ namespace lzham
             return false;
          }
       }
-      
+
       parse_state.m_greedy_parse_total_bytes_coded = cur_ofs;
 
       LZHAM_ASSERT(cur_ofs == bytes_to_parse);
-      
+
       parse_state.m_failed = false;
 
       return true;
@@ -1268,7 +1458,7 @@ namespace lzham
          uint bytes_to_compress = math::minimum(m_accel.get_max_add_bytes(), bytes_remaining);
          if (!compress_block_internal(static_cast<const uint8*>(pBuf) + cur_ofs, bytes_to_compress))
             return false;
-         
+
          cur_ofs += bytes_to_compress;
          bytes_remaining -= bytes_to_compress;
       }
@@ -1286,7 +1476,7 @@ namespace lzham
       cur_block_history.m_ratio = ratio;
       cur_block_history.m_raw_block = raw_block;
       cur_block_history.m_reset_update_rate = reset_update_rate;
-            
+
       m_block_history_size = LZHAM_MIN(m_block_history_size + 1, cMaxBlockHistorySize);
    }
 
@@ -1294,7 +1484,7 @@ namespace lzham
    {
       if (!m_block_history_size)
          return 0;
-      
+
       uint64 total_scaled_ratio = 0;
       for (uint i = 0; i < m_block_history_size; i++)
          total_scaled_ratio += m_block_history[i].m_ratio;
@@ -1322,7 +1512,7 @@ namespace lzham
          max_scaled_ratio = LZHAM_MAX(m_block_history[i].m_ratio, max_scaled_ratio);
       return max_scaled_ratio;
    }
-   
+
    uint lzcompressor::get_total_recent_reset_update_rate()
    {
       uint total_resets = 0;
@@ -1344,19 +1534,20 @@ namespace lzham
 
       m_src_size += buf_len;
 
+      // Important: Don't do any expensive work until after add_bytes_begin() is called, to increase parallelism.
       if (!m_accel.add_bytes_begin(buf_len, static_cast<const uint8*>(pBuf)))
          return false;
+
+      m_start_of_block_state = m_state;
 
       m_src_adler32 = adler32(pBuf, buf_len, m_src_adler32);
 
       m_block_start_dict_ofs = m_accel.get_lookahead_pos() & (m_accel.get_max_dict_size() - 1);
-      
-      m_start_of_block_state = m_state;
 
       uint cur_dict_ofs = m_block_start_dict_ofs;
 
       uint bytes_to_match = buf_len;
-            
+
       if (!m_codec.start_encoding((buf_len * 9) / 8))
          return false;
 
@@ -1373,16 +1564,11 @@ namespace lzham
       if (!m_codec.encode_bits(cCompBlock, cBlockHeaderBits))
          return false;
 
-      uint block_check_bits = LZHAM_RND_CONG(m_block_index);
-      block_check_bits = (block_check_bits ^ (block_check_bits >> 8)) & ((1U << cBlockCheckBits) - 1U);
-      if (!m_codec.encode_bits(block_check_bits, cBlockCheckBits))
-         return false;
-
       if (!m_codec.encode_arith_init())
          return false;
-      
+
       m_state.start_of_block(m_accel, cur_dict_ofs, m_block_index);
-      
+
       bool emit_reset_update_rate_command = false;
 
       // Determine if it makes sense to reset the Huffman table update frequency back to their initial (maximum) rates.
@@ -1410,11 +1596,11 @@ namespace lzham
             }
          }
       }
-      
+
       if (emit_reset_update_rate_command)
          m_state.reset_update_rate();
 
-      m_codec.encode_bits(emit_reset_update_rate_command ? 1 : 0, 1);
+      m_codec.encode_bits(emit_reset_update_rate_command ? 1 : 0, cBlockFlushTypeBits);
 
       coding_stats initial_stats(m_stats);
 
@@ -1433,7 +1619,7 @@ namespace lzham
             greedy_parse_state.m_issue_reset_state_partial = false;
             greedy_parse_state.m_start_ofs = cur_dict_ofs;
             greedy_parse_state.m_bytes_to_match = LZHAM_MIN(bytes_to_match, CLZBase::cMaxHugeMatchLen);
-            
+
             greedy_parse_state.m_max_greedy_decisions = LZHAM_MAX((bytes_to_match / cAvgAcceptableGreedyMatchLen), 2);
             greedy_parse_state.m_greedy_parse_gave_up = false;
             greedy_parse_state.m_greedy_parse_total_bytes_coded = 0;
@@ -1455,7 +1641,7 @@ namespace lzham
                uint num_small_decisions = 0;
                uint total_match_len = 0;
                uint max_match_len = 0;
-               
+
                uint i;
                for (i = 0; i < best_decisions.size(); i++)
                {
@@ -1479,7 +1665,7 @@ namespace lzham
                   }
                }
             }
-            
+
             if (num_greedy_decisions_to_code)
             {
                for (uint i = 0; i < num_greedy_decisions_to_code; i++)
@@ -1496,7 +1682,7 @@ namespace lzham
                   if (!code_decision(best_decisions[i], cur_dict_ofs, bytes_to_match))
                      return false;
                }
-               
+
                if ((!greedy_parse_state.m_greedy_parse_gave_up) || (!bytes_to_match))
                   continue;
             }
@@ -1534,10 +1720,10 @@ namespace lzham
          for (uint parse_thread_index = 0; parse_thread_index < num_parse_jobs; parse_thread_index++)
          {
             parse_thread_state &parse_thread = m_parse_thread_state[parse_thread_index];
-            
+
             parse_thread.m_initial_state = m_state;
             parse_thread.m_initial_state.m_cur_ofs = parse_thread_start_ofs;
-            
+
             if (parse_thread_index > 0)
             {
                parse_thread.m_initial_state.reset_state_partial();
@@ -1595,7 +1781,7 @@ namespace lzham
                }
             }
          }
-         
+
          {
             scoped_perf_section coding_timer("coding");
 
@@ -1630,7 +1816,7 @@ namespace lzham
                   {
                      LZHAM_ASSERT(best_decisions.front().m_pos == (int)parse_thread.m_start_ofs);
                   }
-                  
+
                   // Loop rearranged to avoid bad x64 codegen problem with MSVC2008.
                   for ( ; ; )
                   {
@@ -1653,7 +1839,7 @@ namespace lzham
 
                   i;
                }
-                              
+
                LZHAM_ASSERT(cur_dict_ofs == parse_thread.m_start_ofs + parse_thread.m_bytes_to_match);
 
             } // parse_thread_index
@@ -1698,9 +1884,9 @@ namespace lzham
          m_step = initial_step;
          //m_stats = initial_stats;
 
-         m_codec.clear();
+         m_codec.reset();
 
-         if (!m_codec.start_encoding(buf_len + 16)) 
+         if (!m_codec.start_encoding(buf_len + 16))
             return false;
 
          if (!m_block_index)
@@ -1710,36 +1896,36 @@ namespace lzham
          }
 
 #ifdef LZHAM_LZDEBUG
-         if (!m_codec.encode_bits(166, 12)) 
+         if (!m_codec.encode_bits(166, 12))
             return false;
 #endif
 
-         if (!m_codec.encode_bits(cRawBlock, cBlockHeaderBits)) 
+         if (!m_codec.encode_bits(cRawBlock, cBlockHeaderBits))
             return false;
 
          LZHAM_ASSERT(buf_len <= 0x1000000);
-         if (!m_codec.encode_bits(buf_len - 1, 24)) 
+         if (!m_codec.encode_bits(buf_len - 1, 24))
             return false;
 
          // Write buf len check bits, to help increase the probability of detecting corrupted data more early.
          uint buf_len0 = (buf_len - 1) & 0xFF;
          uint buf_len1 = ((buf_len - 1) >> 8) & 0xFF;
          uint buf_len2 = ((buf_len - 1) >> 16) & 0xFF;
-         if (!m_codec.encode_bits((buf_len0 ^ buf_len1) ^ buf_len2, 8)) 
+         if (!m_codec.encode_bits((buf_len0 ^ buf_len1) ^ buf_len2, 8))
             return false;
-         
-         if (!m_codec.encode_align_to_byte()) 
+
+         if (!m_codec.encode_align_to_byte())
             return false;
 
          const uint8* pSrc = m_accel.get_ptr(m_block_start_dict_ofs);
 
          for (uint i = 0; i < buf_len; i++)
          {
-            if (!m_codec.encode_bits(*pSrc++, 8)) 
+            if (!m_codec.encode_bits(*pSrc++, 8))
                return false;
          }
 
-         if (!m_codec.stop_encoding(true)) 
+         if (!m_codec.stop_encoding(true))
             return false;
 
          used_raw_block = true;
@@ -1749,7 +1935,7 @@ namespace lzham
       uint comp_size = m_codec.get_encoding_buf().size();
       uint scaled_ratio =  (comp_size * cBlockHistoryCompRatioScale) / buf_len;
       update_block_history(comp_size, buf_len, scaled_ratio, used_raw_block, emit_reset_update_rate_command);
-      
+
       //printf("\n%u, %u, %u, %u\n", m_block_index, 500*emit_reset_update_rate_command, scaled_ratio, get_recent_block_ratio());
 
       {
@@ -1770,7 +1956,7 @@ namespace lzham
       if (emit_reset_update_rate_command)
          m_stats.m_total_update_rate_resets++;
 #endif
-      
+
       m_block_index++;
 
       return true;

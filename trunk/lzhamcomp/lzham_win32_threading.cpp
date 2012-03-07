@@ -195,6 +195,26 @@ namespace lzham
       return 0;
    }
 
+   static uint g_num_processors;
+
+   uint lzham_get_max_helper_threads()
+   {
+      if (!g_num_processors)
+      {
+         SYSTEM_INFO system_info;
+         GetSystemInfo(&system_info);
+         g_num_processors = system_info.dwNumberOfProcessors;
+      }
+
+      if (g_num_processors > 1)
+      {
+         // use all CPU's
+         return LZHAM_MIN(task_pool::cMaxThreads, g_num_processors - 1);
+      }
+
+      return 0;
+   }
+
 } // namespace lzham
 
 #endif // LZHAM_USE_WIN32_API

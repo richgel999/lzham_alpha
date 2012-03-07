@@ -64,7 +64,7 @@ namespace lzham
       }
    #endif // LZHAM_MEM_STATS
 
-   static void* lzham_default_realloc(void* p, size_t size, size_t* pActual_size, bool movable, void* pUser_data)
+   static void* lzham_default_realloc(void* p, size_t size, size_t* pActual_size, lzham_bool movable, void* pUser_data)
    {
       pUser_data;
 

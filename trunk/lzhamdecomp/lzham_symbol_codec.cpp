@@ -11,7 +11,7 @@
 namespace lzham
 {
    // Using a fixed table to convert from scaled probability to scaled bits for determinism across compilers/run-time libs/platforms.
-   uint32 gProbCost[cSymbolCodecArithProbScale] = 
+   uint32 g_prob_cost[cSymbolCodecArithProbScale] = 
    {
       0x0,0xB000000,0xA000000,0x96A3FE6,0x9000000,0x8AD961F,0x86A3FE6,0x8315130,0x8000000,0x7D47FCC,0x7AD961F,
       0x78A62B0,0x76A3FE6,0x74CAFFC,0x7315130,0x717D605,0x7000000,0x6E99C09,0x6D47FCC,0x6C087D3,0x6AD961F,0x69B9116,
@@ -215,8 +215,8 @@ namespace lzham
 			for (uint i = 0; i < cSymbolCodecArithProbScale; i++)
 			{
             double flBits = i ? (-log(i * (1.0 / cSymbolCodecArithProbScale)) * cInvLn2) : 0;
-				gProbCost[i] = static_cast<uint32>(floor(.5f + flBits * cBitCostScale));
-            printf("0x%X,", gProbCost[i]);
+				g_prob_cost[i] = static_cast<uint32>(floor(.5f + flBits * cBitCostScale));
+            printf("0x%X,", g_prob_cost[i]);
             if ((i % 11) == 10) printf("\n");
 			}
          printf("\n");
@@ -264,10 +264,10 @@ namespace lzham
          lzham_delete(m_pDecode_tables);
    }
 
-   raw_quasi_adaptive_huffman_data_model& raw_quasi_adaptive_huffman_data_model::operator= (const raw_quasi_adaptive_huffman_data_model& rhs)
+   bool raw_quasi_adaptive_huffman_data_model::assign(const raw_quasi_adaptive_huffman_data_model& rhs)
    {
       if (this == &rhs)
-         return *this;
+         return true;
 
       m_total_syms = rhs.m_total_syms;
 
@@ -286,14 +286,20 @@ namespace lzham
       if (rhs.m_pDecode_tables)
       {
          if (m_pDecode_tables)
-            *m_pDecode_tables = *rhs.m_pDecode_tables;
+         {
+            if (!m_pDecode_tables->assign(*rhs.m_pDecode_tables))
+            {
+               clear();
+               return false;
+            }
+         }
          else
          {
             m_pDecode_tables = lzham_new<prefix_coding::decoder_tables>(*rhs.m_pDecode_tables);
             if (!m_pDecode_tables)
             {
                clear();
-               return *this;
+               return false;
             }
          }
       }
@@ -308,6 +314,12 @@ namespace lzham
       m_fast_updating = rhs.m_fast_updating;
       m_use_polar_codes = rhs.m_use_polar_codes;
 
+      return true;
+   }
+
+   raw_quasi_adaptive_huffman_data_model& raw_quasi_adaptive_huffman_data_model::operator= (const raw_quasi_adaptive_huffman_data_model& rhs)
+   {
+      assign(rhs);
       return *this;
    }
 
@@ -499,7 +511,7 @@ namespace lzham
 
       if (max_code_size > prefix_coding::cMaxExpectedCodeSize)
       {
-         bool status = prefix_coding::limit_max_code_size(m_total_syms, &m_code_sizes[0], prefix_coding::cMaxExpectedCodeSize);
+         status = prefix_coding::limit_max_code_size(m_total_syms, &m_code_sizes[0], prefix_coding::cMaxExpectedCodeSize);
          LZHAM_ASSERT(status);
          if (!status)
             return false;
@@ -665,8 +677,8 @@ namespace lzham
    {
       clear();
    }
-
-   void symbol_codec::clear()
+   
+   void symbol_codec::reset()
    {
       m_pDecode_buf = NULL;
       m_pDecode_buf_next = NULL;
@@ -684,15 +696,24 @@ namespace lzham
       m_arith_length = 0;
       m_arith_total_bits = 0;
 
-      m_output_buf.clear();
-      m_arith_output_buf.clear();
-      m_output_syms.clear();
+      m_output_buf.try_resize(0);
+      m_arith_output_buf.try_resize(0);
+      m_output_syms.try_resize(0);
 
       m_pDecode_need_bytes_func = NULL;
       m_pDecode_private_data = NULL;
       m_pSaved_huff_model = NULL;
       m_pSaved_model = NULL;
       m_saved_node_index = 0;
+   }
+
+   void symbol_codec::clear()
+   {
+      reset();
+
+      m_output_buf.clear();
+      m_arith_output_buf.clear();
+      m_output_syms.clear();
    }
 
    bool symbol_codec::start_encoding(uint expected_file_size)
@@ -810,7 +831,7 @@ namespace lzham
    {
       do
       {
-         if (!m_arith_output_buf.try_push_back( (m_arith_base >> 24) & 0xFF ))
+         if (!m_arith_output_buf.try_push_back((m_arith_base >> 24) & 0xFF))
             return false;
          m_total_bits_written += 8;
 
@@ -1019,7 +1040,8 @@ namespace lzham
 
       uint arith_buf_ofs = 0;
 
-      // Intermix the final Arithmetic, Huffman, or plain bits onto a single combined bitstream.
+      // Intermix the final Arithmetic, Huffman, or plain bits to a single combined bitstream.
+      // All bits from each source must be output in exactly the same order that the decompressor will read them.
       for (uint sym_index = 0; sym_index < m_output_syms.size(); sym_index++)
       {
          const output_symbol& sym = m_output_syms[sym_index];
@@ -1048,6 +1070,7 @@ namespace lzham
          }
          else if (sym.m_num_bits == output_symbol::cArithSym)
          {
+            // This renorm logic must match the logic used in the arithmetic decoder.
             if (m_arith_length < cSymbolCodecArithMinLen)
             {
                do

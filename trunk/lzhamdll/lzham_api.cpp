@@ -1,4 +1,4 @@
-// File: lzham_api.cpp
+// File: lzham_api.cpp - Dynamic DLL entrypoints.
 // See Copyright Notice and license at the end of include/lzham.h
 #include "lzham_core.h"
 #include "lzham_decomp.h"
@@ -48,6 +48,11 @@ extern "C" LZHAM_DLL_EXPORT lzham_compress_state_ptr lzham_compress_init(const l
    return lzham::lzham_lib_compress_init(pParams);
 }
 
+extern "C" LZHAM_DLL_EXPORT lzham_compress_state_ptr lzham_compress_reinit(lzham_compress_state_ptr p)
+{
+   return lzham::lzham_lib_compress_reinit(p);
+}
+
 extern "C" LZHAM_DLL_EXPORT lzham_uint32 lzham_compress_deinit(lzham_compress_state_ptr p)
 {
    return lzham::lzham_lib_compress_deinit(p);
@@ -62,8 +67,113 @@ extern "C" LZHAM_DLL_EXPORT lzham_compress_status_t lzham_compress(
    return lzham::lzham_lib_compress(p, pIn_buf, pIn_buf_size, pOut_buf, pOut_buf_size, no_more_input_bytes_flag);
 }   
 
+extern "C" LZHAM_DLL_EXPORT lzham_compress_status_t lzham_compress2(
+   lzham_compress_state_ptr p,
+   const lzham_uint8 *pIn_buf, size_t *pIn_buf_size, 
+   lzham_uint8 *pOut_buf, size_t *pOut_buf_size,
+   lzham_flush_t flush_type)
+{
+   return lzham::lzham_lib_compress2(p, pIn_buf, pIn_buf_size, pOut_buf, pOut_buf_size, flush_type);
+}   
+
 extern "C" LZHAM_DLL_EXPORT lzham_compress_status_t lzham_compress_memory(const lzham_compress_params *pParams, lzham_uint8* pDst_buf, size_t *pDst_len, const lzham_uint8* pSrc_buf, size_t src_len, lzham_uint32 *pAdler32)
 {
    return lzham::lzham_lib_compress_memory(pParams, pDst_buf, pDst_len, pSrc_buf, src_len, pAdler32);
 }
 
+// ----------------- zlib-style API's
+
+extern "C" LZHAM_DLL_EXPORT const char *lzham_z_version(void)
+{
+   return LZHAM_Z_VERSION;
+}
+
+extern "C" lzham_z_ulong LZHAM_DLL_EXPORT lzham_z_adler32(lzham_z_ulong adler, const unsigned char *ptr, size_t buf_len)
+{
+   return lzham::lzham_lib_z_adler32(adler, ptr, buf_len);
+}
+
+extern "C" lzham_z_ulong LZHAM_DLL_EXPORT lzham_z_crc32(lzham_z_ulong crc, const lzham_uint8 *ptr, size_t buf_len)
+{
+   return lzham::lzham_lib_z_crc32(crc, ptr, buf_len);
+}
+
+extern "C" LZHAM_DLL_EXPORT int lzham_z_deflateInit(lzham_z_streamp pStream, int level)
+{
+   return lzham::lzham_lib_z_deflateInit(pStream, level);
+}
+
+extern "C" LZHAM_DLL_EXPORT int lzham_z_deflateInit2(lzham_z_streamp pStream, int level, int method, int window_bits, int mem_level, int strategy)
+{
+   return lzham::lzham_lib_z_deflateInit2(pStream, level, method, window_bits, mem_level, strategy);
+}
+
+extern "C" LZHAM_DLL_EXPORT int lzham_z_deflateReset(lzham_z_streamp pStream)
+{
+   return lzham::lzham_lib_z_deflateReset(pStream);
+}
+
+extern "C" LZHAM_DLL_EXPORT int lzham_z_deflate(lzham_z_streamp pStream, int flush)
+{
+   return lzham::lzham_lib_z_deflate(pStream, flush);
+}
+
+extern "C" LZHAM_DLL_EXPORT int lzham_z_deflateEnd(lzham_z_streamp pStream)
+{
+   return lzham::lzham_lib_z_deflateEnd(pStream);
+}
+
+extern "C" LZHAM_DLL_EXPORT lzham_z_ulong lzham_z_deflateBound(lzham_z_streamp pStream, lzham_z_ulong source_len)
+{
+   return lzham::lzham_lib_z_deflateBound(pStream, source_len);
+}
+
+extern "C" LZHAM_DLL_EXPORT int lzham_z_compress(unsigned char *pDest, lzham_z_ulong *pDest_len, const unsigned char *pSource, lzham_z_ulong source_len)
+{
+   return lzham::lzham_lib_z_compress(pDest, pDest_len, pSource, source_len);
+}
+
+extern "C" LZHAM_DLL_EXPORT int lzham_z_compress2(unsigned char *pDest, lzham_z_ulong *pDest_len, const unsigned char *pSource, lzham_z_ulong source_len, int level)
+{
+   return lzham::lzham_lib_z_compress2(pDest, pDest_len, pSource, source_len, level);
+}
+
+extern "C" LZHAM_DLL_EXPORT lzham_z_ulong lzham_z_compressBound(lzham_z_ulong source_len)
+{
+   return lzham::lzham_lib_z_compressBound(source_len);
+}
+
+extern "C" LZHAM_DLL_EXPORT int lzham_z_inflateInit(lzham_z_streamp pStream)
+{
+   return lzham::lzham_lib_z_inflateInit(pStream);
+}
+
+extern "C" LZHAM_DLL_EXPORT int lzham_z_inflateInit2(lzham_z_streamp pStream, int window_bits)
+{
+   return lzham::lzham_lib_z_inflateInit2(pStream, window_bits);
+}
+
+extern "C" LZHAM_DLL_EXPORT int lzham_z_inflateReset(lzham_z_streamp pStream)
+{
+   return lzham::lzham_lib_z_inflateReset(pStream);
+}
+
+extern "C" LZHAM_DLL_EXPORT int lzham_z_inflate(lzham_z_streamp pStream, int flush)
+{
+   return lzham::lzham_lib_z_inflate(pStream, flush);
+}
+
+extern "C" LZHAM_DLL_EXPORT int lzham_z_inflateEnd(lzham_z_streamp pStream)
+{
+   return lzham::lzham_lib_z_inflateEnd(pStream);
+}
+
+extern "C" LZHAM_DLL_EXPORT int lzham_z_uncompress(unsigned char *pDest, lzham_z_ulong *pDest_len, const unsigned char *pSource, lzham_z_ulong source_len)
+{
+   return lzham::lzham_lib_z_uncompress(pDest, pDest_len, pSource, source_len);
+}
+
+extern "C" LZHAM_DLL_EXPORT const char *lzham_z_error(int err)
+{
+   return lzham::lzham_lib_z_error(err);
+}

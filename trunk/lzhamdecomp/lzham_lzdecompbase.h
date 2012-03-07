@@ -57,11 +57,12 @@ namespace lzham
       {
          cBlockHeaderBits = 2,
          cBlockCheckBits = 4,
+         cBlockFlushTypeBits = 2,
          
+         cSyncBlock = 0,
          cCompBlock = 1,
          cRawBlock = 2,
          cEOFBlock = 3
-         //cCopyBlock = 4  // TODO
       };
       
       enum

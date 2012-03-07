@@ -361,6 +361,8 @@ namespace lzham
       Sleep(milliseconds);
    }
 
+   uint lzham_get_max_helper_threads();
+
 } // namespace lzham
 
 #endif // LZHAM_USE_WIN32_API

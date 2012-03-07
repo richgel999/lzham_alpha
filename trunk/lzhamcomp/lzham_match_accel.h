@@ -40,6 +40,9 @@ namespace lzham
       // For each length, it will discard matches with worse distances (in the coding sense).
       bool init(CLZBase* pLZBase, task_pool* pPool, uint max_helper_threads, uint max_dict_size, uint max_matches, bool all_matches, uint max_probes);
       
+      void reset();
+      void flush();
+      
       inline uint get_max_dict_size() const { return m_max_dict_size; }
       inline uint get_max_dict_size_mask() const { return m_max_dict_size_mask; }
       inline uint get_cur_dict_size() const { return m_cur_dict_size; }
@@ -118,6 +121,7 @@ namespace lzham
       
       lzham::vector<uint8> m_hash_thread_index;
       
+      enum { cDigramHashSize = 4096 };
       lzham::vector<uint> m_digram_hash;
       lzham::vector<uint> m_digram_next;
                                           

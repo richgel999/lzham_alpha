@@ -24,27 +24,29 @@ namespace lzham
             
       memset(hist, 0, sizeof(hist[0]) * 256 * cMaxPasses);
 
-      sym_freq* p = syms0;
-      sym_freq* q = syms0 + (num_syms >> 1) * 2;
-
-      for ( ; p != q; p += 2)
       {
-         const uint freq0 = p[0].m_freq;
-         const uint freq1 = p[1].m_freq;
+         sym_freq* p = syms0;
+         sym_freq* q = syms0 + (num_syms >> 1) * 2;
 
-         hist[        freq0         & 0xFF]++;
-         hist[256 + ((freq0 >>  8) & 0xFF)]++;
+         for ( ; p != q; p += 2)
+         {
+            const uint freq0 = p[0].m_freq;
+            const uint freq1 = p[1].m_freq;
 
-         hist[        freq1        & 0xFF]++;
-         hist[256 + ((freq1 >>  8) & 0xFF)]++;
-      }
+            hist[        freq0         & 0xFF]++;
+            hist[256 + ((freq0 >>  8) & 0xFF)]++;
 
-      if (num_syms & 1)
-      {
-         const uint freq = p->m_freq;
+            hist[        freq1        & 0xFF]++;
+            hist[256 + ((freq1 >>  8) & 0xFF)]++;
+         }
+      
+         if (num_syms & 1)
+         {
+            const uint freq = p->m_freq;
 
-         hist[        freq        & 0xFF]++;
-         hist[256 + ((freq >>  8) & 0xFF)]++;
+            hist[        freq        & 0xFF]++;
+            hist[256 + ((freq >>  8) & 0xFF)]++;
+         }
       }
       
       sym_freq* pCur_syms = syms0;
