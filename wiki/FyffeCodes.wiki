@@ -6,6 +6,9 @@ Graham Fyffe published this article on a near-optimal binary prefix code constru
 
 I implemented Fyffe codes in an experimental form in LZHAM last year, but my initial implementation wasn't any faster than linear time Huffman. My first implementation had some deficiencies however, so I may try again.
 
+This article was cited by this paper:
+[http://citeseerx.ist.psu.edu/viewdoc/summary?doi=10.1.1.125.4017 Fast Construction of Disposable Prefix-Free Codes], by Danny Dubé, Université Laval
+
 == Fyffe Codes for Fast Codelength Approximation ==
 By Graham Fyffe - 1999
 
