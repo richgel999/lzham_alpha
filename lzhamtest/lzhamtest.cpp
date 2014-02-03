@@ -18,10 +18,6 @@
 
 #include "timer.h"
 
-#if defined(_WIN64) || defined(__MINGW64__) || defined(_LP64) || defined(__LP64__)
-#define LZHAMTEST_64BIT 1
-#endif
-
 #define my_max(a,b) (((a) > (b)) ? (a) : (b))
 #define my_min(a,b) (((a) < (b)) ? (a) : (b))
 
@@ -78,7 +74,7 @@ typedef unsigned int uint32;
    typedef signed __int64        int64;
 #endif
 
-#ifdef LZHAMTEST_64BIT
+#ifdef LZHAM_64BIT
    #define LZHAMTEST_MAX_POSSIBLE_DICT_SIZE LZHAM_MAX_DICT_SIZE_LOG2_X64
    // 256MB default dictionary size under x64 (max is 512MB, but this requires more than 4GB of physical memory without thrashing)
    #define LZHAMTEST_DEFAULT_DICT_SIZE 28
@@ -1549,7 +1545,7 @@ int main(int argc, char *argv[])
    DmMapDevkitDrive();
 #endif
 
-#ifdef LZHAMTEST_64BIT
+#ifdef LZHAM_64BIT
    printf("LZHAM Codec - x64 Command Line Test App - Compiled %s %s\n", __DATE__, __TIME__);
 #else
    printf("LZHAM Codec - x86 Command Line Test App - Compiled %s %s\n", __DATE__, __TIME__);

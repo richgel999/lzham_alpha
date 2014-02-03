@@ -28,6 +28,10 @@
 // Lower byte = minor version
 #define LZHAM_DLL_VERSION 0x1008
 
+#if defined(_WIN64) || defined(__MINGW64__) || defined(_LP64) || defined(__LP64__)
+	#define LZHAM_64BIT 1
+#endif
+
 #if defined(_MSC_VER)
    #define LZHAM_CDECL __cdecl
 #else
