@@ -606,7 +606,7 @@ namespace lzham
 
    bool adaptive_arith_data_model::init(bool encoding, uint total_syms)
    {
-      encoding;
+      LZHAM_NOTE_UNUSED(encoding);
       if (!total_syms)
       {
          clear();

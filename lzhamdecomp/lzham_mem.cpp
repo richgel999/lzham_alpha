@@ -66,7 +66,7 @@ namespace lzham
 
    static void* lzham_default_realloc(void* p, size_t size, size_t* pActual_size, lzham_bool movable, void* pUser_data)
    {
-      pUser_data;
+      LZHAM_NOTE_UNUSED(pUser_data);
 
       void* p_new;
 
@@ -121,7 +121,7 @@ namespace lzham
 
    static size_t lzham_default_msize(void* p, void* pUser_data)
    {
-      pUser_data;
+      LZHAM_NOTE_UNUSED(pUser_data);
       return p ? _msize(p) : 0;
    }
 

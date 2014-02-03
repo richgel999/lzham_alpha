@@ -21,8 +21,8 @@ namespace lzham
       static inline void construct(T** p) { memset(p, 0, sizeof(T*)); }
       static inline void construct(T** p, T* init) { *p = init; }
       static inline void construct_array(T** p, uint n) { memset(p, 0, sizeof(T*) * n); }
-      static inline void destruct(T** p) { p; }
-      static inline void destruct_array(T** p, uint n) { p, n; }
+      static inline void destruct(T** p) { LZHAM_NOTE_UNUSED(p); }
+      static inline void destruct_array(T** p, uint n) { LZHAM_NOTE_UNUSED(p); LZHAM_NOTE_UNUSED(n); }
    };
 
 #define LZHAM_DEFINE_BUILT_IN_TYPE(X) \
@@ -31,8 +31,8 @@ namespace lzham
    static inline void construct(X* p) { memset(p, 0, sizeof(X)); } \
    static inline void construct(X* p, const X& init) { memcpy(p, &init, sizeof(X)); } \
    static inline void construct_array(X* p, uint n) { memset(p, 0, sizeof(X) * n); } \
-   static inline void destruct(X* p) { p; } \
-   static inline void destruct_array(X* p, uint n) { p, n; } };
+   static inline void destruct(X* p) { LZHAM_NOTE_UNUSED(p); } \
+   static inline void destruct_array(X* p, uint n) { LZHAM_NOTE_UNUSED(p); LZHAM_NOTE_UNUSED(n); } };
 
    LZHAM_DEFINE_BUILT_IN_TYPE(bool)
    LZHAM_DEFINE_BUILT_IN_TYPE(char)
