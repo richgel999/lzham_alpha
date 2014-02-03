@@ -21,7 +21,7 @@ namespace lzham
    public:
       inline semaphore(long initialCount = 0, long maximumCount = 1, const char* pName = NULL)
       {
-         maximumCount, pName;
+         LZHAM_NOTE_UNUSED(maximumCount), LZHAM_NOTE_UNUSED(pName);
          LZHAM_ASSERT(maximumCount >= initialCount);
          if (sem_init(&m_sem, 0, initialCount))
          {
@@ -38,7 +38,7 @@ namespace lzham
       {
          LZHAM_ASSERT(releaseCount >= 1);
 
-         int status;
+         int status = 0;
 #ifdef WIN32
          if (1 == releaseCount)
             status = sem_post(&m_sem);
@@ -185,7 +185,7 @@ namespace lzham
       task_pool(uint num_threads);
       ~task_pool();
 
-      enum { cMaxThreads = 16 };
+      enum { cMaxThreads = LZHAM_MAX_HELPER_THREADS };
       bool init(uint num_threads);
       void deinit();
 

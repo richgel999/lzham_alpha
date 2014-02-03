@@ -391,7 +391,7 @@ namespace lzham
 
    int lzham_lib_z_deflateInit2(lzham_z_streamp pStream, int level, int method, int window_bits, int mem_level, int strategy)
    {
-      strategy;
+      LZHAM_NOTE_UNUSED(strategy);
 
       if (!pStream)
          return LZHAM_Z_STREAM_ERROR;
@@ -554,7 +554,7 @@ namespace lzham
 
    lzham_z_ulong lzham_lib_z_deflateBound(lzham_z_streamp pStream, lzham_z_ulong source_len)
    {
-      pStream;
+      LZHAM_NOTE_UNUSED(pStream);
       return 64 + source_len + ((source_len + 4095) / 4096) * 4;
    }
 

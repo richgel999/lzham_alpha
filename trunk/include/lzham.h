@@ -78,7 +78,7 @@ extern "C" {
    #define LZHAM_MAX_DICT_SIZE_LOG2_X86 26
    #define LZHAM_MAX_DICT_SIZE_LOG2_X64 29
 
-   #define LZHAM_MAX_HELPER_THREADS 16
+   #define LZHAM_MAX_HELPER_THREADS 64
 
    typedef enum
    {

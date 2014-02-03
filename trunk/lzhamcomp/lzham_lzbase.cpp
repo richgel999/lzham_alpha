@@ -16,7 +16,7 @@ namespace lzham
 
          uint8* pTab;
          uint shift;
-         uint n;
+         uint n; LZHAM_NOTE_UNUSED(n);
 
          if (hi < 0x1000)
          {
