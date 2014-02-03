@@ -130,7 +130,7 @@ namespace lzham
       void clear();
 
       bool init(bool encoding, uint total_syms);
-      bool init(bool encoding, uint total_syms, bool fast_encoding, bool use_polar_codes = false) { fast_encoding, use_polar_codes; return init(encoding, total_syms); }
+      bool init(bool encoding, uint total_syms, bool fast_encoding, bool use_polar_codes = false) { LZHAM_NOTE_UNUSED(fast_encoding), LZHAM_NOTE_UNUSED(use_polar_codes); return init(encoding, total_syms); }
       void reset();
 
       void reset_update_rate();
@@ -530,7 +530,7 @@ namespace lzham
 }
 #endif
 
-#define LZHAM_SYMBOL_CODEC_DECODE_ALIGN_TO_BYTE(codec) if (bit_count & 7) { int dummy_result; LZHAM_SYMBOL_CODEC_DECODE_GET_BITS(codec, dummy_result, bit_count & 7); }
+#define LZHAM_SYMBOL_CODEC_DECODE_ALIGN_TO_BYTE(codec) if (bit_count & 7) { int dummy_result; LZHAM_NOTE_UNUSED(dummy_result); LZHAM_SYMBOL_CODEC_DECODE_GET_BITS(codec, dummy_result, bit_count & 7); }
 
 #define LZHAM_SYMBOL_CODEC_DECODE_REMOVE_BYTE_FROM_BIT_BUF(codec, result) \
 { \

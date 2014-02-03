@@ -21,6 +21,7 @@
    #define LZHAM_USE_UNALIGNED_INT_LOADS 1
    #define LZHAM_RESTRICT __restrict
    #define LZHAM_FORCE_INLINE __forceinline
+   #define LZHAM_NOTE_UNUSED(x) (void)x
 
 #elif defined(WIN32) && !defined(LZHAM_ANSI_CPLUSPLUS)
    // MSVC or MinGW, x86 or x64, Win32 API's for threading and Win32 Interlocked API's or GCC built-ins for atomic ops.
@@ -75,6 +76,9 @@
    #if defined(_MSC_VER) || defined(__MINGW32__) || defined(__MINGW64__)
       #define LZHAM_USE_MSVC_INTRINSICS 1
    #endif
+
+   #define LZHAM_NOTE_UNUSED(x) (void)x
+
 #elif defined(__GNUC__) && !defined(LZHAM_ANSI_CPLUSPLUS)
    // GCC x86 or x64, pthreads for threading and GCC built-ins for atomic ops.
    #define LZHAM_PLATFORM_PC 1
@@ -98,7 +102,13 @@
 
    #define LZHAM_RESTRICT
 
-   #define LZHAM_FORCE_INLINE inline __attribute__((__always_inline__,__gnu_inline__))
+   #if defined(__clang__)
+      #define LZHAM_FORCE_INLINE inline
+   #else
+      #define LZHAM_FORCE_INLINE inline __attribute__((__always_inline__,__gnu_inline__))
+   #endif
+
+   #define LZHAM_NOTE_UNUSED(x) (void)x
 #else
    // Vanilla ANSI-C/C++
    // No threading support, unaligned loads are NOT okay.
@@ -123,6 +133,8 @@
 
    #define LZHAM_RESTRICT
    #define LZHAM_FORCE_INLINE inline
+
+   #define LZHAM_NOTE_UNUSED(x) (void)x
 #endif
 
 #if LZHAM_LITTLE_ENDIAN_CPU
