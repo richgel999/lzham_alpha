@@ -167,7 +167,7 @@ static void print_usage()
    printf("-c - Do not compute or verify adler32 checksum during decompression (faster).\n");
    printf("-u - Use unbuffered decompression on files that can fit into memory.\n");
    printf("     Unbuffered decompression is faster, but may have more I/O overhead.\n");
-   printf("-t[0-128] - Number of extra compression helper threads. Default=# CPU's-1.\n");
+   printf("-t[0-64] - Number of extra compression helper threads. Default=# CPU's-1.\n");
    printf("           Note: The total number of threads will be 1 + num_helper_threads,\n");
    printf("           because the main thread is counted separately.\n");
    printf("-v - Immediately decompress compressed file after compression for verification.\n");
