@@ -27,6 +27,10 @@
 #include <process.h>
 #endif
 
+#if defined(__GNUC__)
+#include <sys/sysinfo.h>
+#endif
+
 #if LZHAM_USE_PTHREADS_API
 
 #ifdef WIN32
@@ -203,6 +207,19 @@ namespace lzham
       }
 
       return NULL;
+   }
+
+   uint lzham_get_max_helper_threads()
+   {
+#if defined(__GNUC__)
+      uint num_procs = get_nprocs();
+      return num_procs ? (num_procs - 1) : 0;
+#else
+      printf("TODO: lzham_get_max_helper_threads(): Implement system specific func to determine the max # of helper threads\n");
+
+      // Just assume a dual-core machine.
+      return 1;
+#endif
    }
 
 } // namespace lzham

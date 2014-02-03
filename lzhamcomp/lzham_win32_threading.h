@@ -183,7 +183,7 @@ namespace lzham
       task_pool(uint num_threads);
       ~task_pool();
 
-      enum { cMaxThreads = 16 };
+      enum { cMaxThreads = LZHAM_MAX_HELPER_THREADS };
       bool init(uint num_threads);
       void deinit();
 

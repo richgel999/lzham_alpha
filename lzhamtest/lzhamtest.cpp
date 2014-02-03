@@ -18,6 +18,10 @@
 
 #include "timer.h"
 
+#if defined(_WIN64) || defined(__MINGW64__) || defined(_LP64) || defined(__LP64__)
+#define LZHAMTEST_64BIT 1
+#endif
+
 #define my_max(a,b) (((a) > (b)) ? (a) : (b))
 #define my_min(a,b) (((a) < (b)) ? (a) : (b))
 
@@ -74,7 +78,7 @@ typedef unsigned int uint32;
    typedef signed __int64        int64;
 #endif
 
-#ifdef _WIN64
+#ifdef LZHAMTEST_64BIT
    #define LZHAMTEST_MAX_POSSIBLE_DICT_SIZE LZHAM_MAX_DICT_SIZE_LOG2_X64
    // 256MB default dictionary size under x64 (max is 512MB, but this requires more than 4GB of physical memory without thrashing)
    #define LZHAMTEST_DEFAULT_DICT_SIZE 28
@@ -135,7 +139,7 @@ struct comp_options
    lzham_compress_level m_comp_level;
    int m_dict_size_log2;
    bool m_compute_adler32_during_decomp;
-   int m_max_helper_threads;
+   int m_max_helper_threads;           // -1 = try to auto-detect
    bool m_unbuffered_decompression;
    bool m_verify_compressed_data;
    bool m_force_polar_codes;
@@ -163,7 +167,7 @@ static void print_usage()
    printf("-c - Do not compute or verify adler32 checksum during decompression (faster).\n");
    printf("-u - Use unbuffered decompression on files that can fit into memory.\n");
    printf("     Unbuffered decompression is faster, but may have more I/O overhead.\n");
-   printf("-t[0-16] - Number of compression helper threads. Default=# CPU's-1.\n");
+   printf("-t[0-128] - Number of extra compression helper threads. Default=# CPU's-1.\n");
    printf("           Note: The total number of threads will be 1 + num_helper_threads,\n");
    printf("           because the main thread is counted separately.\n");
    printf("-v - Immediately decompress compressed file after compression for verification.\n");
@@ -476,7 +480,7 @@ static bool compress_file(ilzham &lzham_dll, const char* pSrc_filename, const ch
                fclose(pInFile);
                fclose(pOutFile);
                _aligned_free((void*)params.m_pSeed_bytes);
-               lzham_dll.lzham_decompress_deinit(pComp_state);
+               lzham_dll.lzham_compress_deinit(pComp_state);
                return false;
             }
 
@@ -509,7 +513,7 @@ static bool compress_file(ilzham &lzham_dll, const char* pSrc_filename, const ch
                fclose(pInFile);
                fclose(pOutFile);
                _aligned_free((void*)params.m_pSeed_bytes);
-               lzham_dll.lzham_decompress_deinit(pComp_state);
+               lzham_dll.lzham_compress_deinit(pComp_state);
                return false;
             }
 
@@ -543,7 +547,7 @@ static bool compress_file(ilzham &lzham_dll, const char* pSrc_filename, const ch
             fclose(pInFile);
             fclose(pOutFile);
             _aligned_free((void*)params.m_pSeed_bytes);
-            lzham_dll.lzham_decompress_deinit(pComp_state);
+            lzham_dll.lzham_compress_deinit(pComp_state);
             return false;
          }
          total_init_time = timer::get_ticks() - init_start_time;
@@ -1116,6 +1120,17 @@ static bool test_recursive(ilzham &lzham_dll, const char *pPath, comp_options op
       }
       fseek(pFile, 0, SEEK_END);
       int64 src_file_size = _ftelli64(pFile);
+      if (src_file_size)
+      {
+         // Ensure file is actually readable
+         fseek(pFile, 0, SEEK_SET);
+         if (fgetc(pFile) == EOF)
+         {
+            printf("Skipping unreadable file \"%s\"\n", src_file.c_str());
+            fclose(pFile);
+            continue;
+         }
+      }
       fclose(pFile);
 
       if (!ensure_file_is_writable(cmp_file))
@@ -1525,6 +1540,8 @@ int main()
 int main(int argc, char *argv[])
 #endif
 {
+   (void)g_is_debug;
+
 #ifdef _XBOX
    int argc = 3;
    char *argv[4] = { "", "A", "E:\\samples", "" };
@@ -1532,7 +1549,7 @@ int main(int argc, char *argv[])
    DmMapDevkitDrive();
 #endif
 
-#ifdef _WIN64
+#ifdef LZHAMTEST_64BIT
    printf("LZHAM Codec - x64 Command Line Test App - Compiled %s %s\n", __DATE__, __TIME__);
 #else
    printf("LZHAM Codec - x86 Command Line Test App - Compiled %s %s\n", __DATE__, __TIME__);
@@ -1558,7 +1575,8 @@ int main(int argc, char *argv[])
    }
 #endif
 
-   int num_helper_threads = 0;
+   // -1 = auto-detection
+   int num_helper_threads = -1;
 
 #ifdef _XBOX
    num_helper_threads = 5;
@@ -1569,8 +1587,6 @@ int main(int argc, char *argv[])
    {
       num_helper_threads = g_system_info.dwNumberOfProcessors - 1;
    }
-#else
-   num_helper_threads = 7;
 #endif
 
    printf("Loaded LZHAM DLL version 0x%04X\n\n", lzham_lib.lzham_get_version());

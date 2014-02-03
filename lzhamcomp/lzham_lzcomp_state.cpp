@@ -413,7 +413,7 @@ namespace lzham
 
    bit_cost_t lzcompressor::state::get_len2_match_cost(CLZBase& lzbase, uint dict_pos, uint len2_match_dist, uint is_match_model_index)
    {
-      dict_pos;
+      LZHAM_NOTE_UNUSED(dict_pos);
 
       bit_cost_t cost = m_is_match_model[is_match_model_index].get_cost(1);
 
@@ -484,7 +484,7 @@ namespace lzham
 
    void lzcompressor::state::get_rep_match_costs(uint dict_pos, bit_cost_t *pBitcosts, uint match_hist_index, int min_len, int max_len, uint is_match_model_index) const
    {
-      dict_pos;
+      LZHAM_NOTE_UNUSED(dict_pos);
       // match
       const sym_data_model &rep_len_table = m_rep_len_table[m_cur_state >= CLZBase::cNumLitStates];
 
@@ -566,7 +566,7 @@ namespace lzham
 
    void lzcompressor::state::get_full_match_costs(CLZBase& lzbase, uint dict_pos, bit_cost_t *pBitcosts, uint match_dist, int min_len, int max_len, uint is_match_model_index) const
    {
-      dict_pos;
+      LZHAM_NOTE_UNUSED(dict_pos);
       LZHAM_ASSERT(min_len >= CLZBase::cMinMatchLen);
 
       bit_cost_t cost = m_is_match_model[is_match_model_index].get_cost(1);
@@ -1015,7 +1015,7 @@ namespace lzham
 
    void lzcompressor::state::print(symbol_codec& codec, CLZBase& lzbase, const search_accelerator& dict, const lzdecision& lzdec)
    {
-      codec, lzbase, dict;
+      LZHAM_NOTE_UNUSED(codec), LZHAM_NOTE_UNUSED(lzbase), LZHAM_NOTE_UNUSED(dict);
 
       const uint lit_pred0 = get_pred_char(dict, lzdec.m_pos, 1);
 
@@ -1092,8 +1092,8 @@ namespace lzham
             uint match_slot, match_extra;
             lzbase.compute_lzx_position_slot(lzdec.m_dist, match_slot, match_extra);
 
-            uint match_low_sym = 0;
-            int large_len_sym = -1;
+            uint match_low_sym = 0; LZHAM_NOTE_UNUSED(match_low_sym);
+            int large_len_sym = -1; LZHAM_NOTE_UNUSED(large_len_sym);
             if (lzdec.m_len >= 9)
             {
                match_low_sym = 7;
@@ -1103,7 +1103,7 @@ namespace lzham
             else
                match_low_sym = lzdec.m_len - 2;
 
-            uint match_high_sym = 0;
+            uint match_high_sym = 0; LZHAM_NOTE_UNUSED(match_high_sym);
 
             LZHAM_ASSERT(match_slot >= CLZBase::cLZXLowestUsableMatchSlot && (match_slot < lzbase.m_num_lzx_slots));
             match_high_sym = match_slot - CLZBase::cLZXLowestUsableMatchSlot;
@@ -1202,7 +1202,7 @@ namespace lzham
 
    void lzcompressor::state::start_of_block(const search_accelerator& dict, uint cur_ofs, uint block_index)
    {
-      dict, block_index;
+      LZHAM_NOTE_UNUSED(dict), LZHAM_NOTE_UNUSED(block_index);
 
       reset_state_partial();
 
@@ -1388,7 +1388,7 @@ namespace lzham
 
             uint cur_lookahead_size = dict.get_lookahead_size();
 
-            uint actual_match_len = dict.get_match_len(0, match_dist, LZHAM_MIN(cur_lookahead_size, CLZBase::cMaxMatchLen));
+            uint actual_match_len = dict.get_match_len(0, match_dist, LZHAM_MIN(cur_lookahead_size, static_cast<uint>(CLZBase::cMaxMatchLen)));
             LZHAM_VERIFY(match_len <= actual_match_len);
 
             m_total_truncated_matches += match_len < actual_match_len;
