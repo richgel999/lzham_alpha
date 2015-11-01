@@ -1,6 +1,9 @@
 LZHAM Lossless Data Compression Codec - Alpha8 - March 6, 2012
 Copyright (c) 2009-2012 Richard Geldreich, Jr. <richgel99@gmail.com>
-MIT License - http://code.google.com/p/lzham/
+MIT License
+
+Note: This is the old alpha version of the LZHAM codec, exported from Google Code.
+The latest v1.x release is located on GitHub here: https://github.com/richgel999/lzham_codec
 
 lzhamtest_x86/x64 is a simple command line test program that uses the LZHAM codec DLL to compress/decompress single files.
 
